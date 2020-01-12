@@ -1,0 +1,10 @@
+{
+    "authors": [
+        "Grim Maple"
+    ],
+    "copyright": "Copyright © 2020, Grim Maple",
+    "description": "Maple's Utility for D",
+    "license": "MIT",
+    "name": "mud",
+    "targetType": "sourceLibrary"
+}
