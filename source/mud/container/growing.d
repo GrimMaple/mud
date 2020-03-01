@@ -23,6 +23,16 @@ if(__traits(isArithmetic, T))
         assert(container[0] == 10);
     }
 
+    /// Returns primitives as an array
+    @property ref T[] get() { return primitives; }
+    ///
+    unittest
+    {
+        GrowingContainer!int container;
+        container.put(10);
+        assert(container.get[0] == 10);
+    }
+
     /// Returns container's internal capacity
     @property size_t capacity() { return sz; }
     ///
@@ -76,7 +86,7 @@ private:
     void grow() @trusted
     {
         void[] r = cast(void[]) primitives;
-        T[] newMem = cast(int[])Allocator.instance.allocate(T.sizeof * (sz + size));
+        T[] newMem = cast(T[])Allocator.instance.allocate(T.sizeof * (sz + size));
         newMem[0 .. sz] = primitives[0 .. sz];
         Allocator.instance.deallocate(primitives);
         primitives = newMem;
