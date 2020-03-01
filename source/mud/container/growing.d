@@ -33,6 +33,16 @@ if(__traits(isArithmetic, T))
         assert(container.get[0] == 10);
     }
 
+    /// Returns a slice of `T[]` that only has `count` primitives in it
+    @property T[] getPartial() { return primitives[0 .. pos]; }
+    ///
+    unittest
+    {
+        GrowingContainer!int container;
+        container.put(10);
+        assert(container.getPartial.length == 1);
+    }
+
     /// Returns container's internal capacity
     @property size_t capacity() { return sz; }
     ///
@@ -75,6 +85,21 @@ if(__traits(isArithmetic, T))
         GrowingContainer!int container;
         container.put(10);
         assert(container[0] == 10);
+    }
+
+    /// Reset the current container to zero. Doesn't deallocate memory
+    void reset()
+    {
+        pos = 0;
+    }
+    ///
+    unittest
+    {
+        GrowingContainer!int container;
+        container.put(10);
+        assert(container.count != 0);
+        container.reset();
+        assert(container.count == 0);
     }
 
     ~this() @trusted
