@@ -4,7 +4,7 @@ import std.experimental.allocator.mallocator;
 import std.conv : emplace;
 import std.functional : forward;
 
-@safe @nogc nothrow
+@safe @nogc
 {
 
 /// Create a new unique pointer of class type `T`, using allocator `Allocator`.
