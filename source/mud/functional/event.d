@@ -1,14 +1,13 @@
 module source.mud.functional.event;
 
 import std.container.array;
-import mud.container.growing;
 
 /// C#-like events!
 struct Event(Args...)
 {
     alias delegateType = void delegate(Args);
 
-    /// Convenienve subscription overload
+    /// Convenience subscription overload
     void opOpAssign(string s)(delegateType deleg) @safe @nogc nothrow if(s == "~")
     {
         subscribe(deleg);
@@ -66,6 +65,7 @@ struct Event(Args...)
         evt.remove(&local);
         evt(10);
         assert(z == 0);
+        local(10);
     }
 
     /// Call the event
@@ -77,7 +77,7 @@ struct Event(Args...)
 
     ~this() @safe @nogc nothrow {}
 private:
-    Array!delegateType delegates;// = new delegateType[0];
+    Array!delegateType delegates;
 }
 ///
 unittest
