@@ -7,7 +7,7 @@ import std.experimental.allocator.mallocator;
 /// A container of primitives of type `T` that automatically grows when necessary. 
 /// The `size` parameter is the growth size
 struct GrowingContainer(T, size_t size = 1000, Allocator = Mallocator)
-if(__traits(isArithmetic, T))
+if(__traits(isPOD, T) || __traits(isArithmetic, T))
 {
     /// Accesses element at index `index`
     auto opIndex(size_t index)

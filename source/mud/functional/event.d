@@ -1,12 +1,15 @@
 module source.mud.functional.event;
 
+import std.container.array;
+import mud.container.growing;
+
 /// C#-like events!
 struct Event(Args...)
 {
     alias delegateType = void delegate(Args);
 
     /// Convenienve subscription overload
-    void opOpAssign(string s)(delegateType deleg) if(s == "~")
+    void opOpAssign(string s)(delegateType deleg) @safe @nogc nothrow if(s == "~")
     {
         subscribe(deleg);
     }
@@ -19,9 +22,9 @@ struct Event(Args...)
     }
 
     /// Subscribe to event
-    void subscribe(delegateType deleg)
+    void subscribe(delegateType deleg) @trusted @nogc nothrow
     {
-        delegates ~= [deleg];
+        delegates.insert(deleg);
     }
     ///
     unittest
@@ -38,28 +41,43 @@ struct Event(Args...)
     }
 
     /// Remove a subscriber
-    void remove(delegateType deleg)
+    void remove(delegateType deleg) @trusted @nogc nothrow
     {
-        import std.algorithm : remove;
-        delegates = delegates.remove!(a => a.ptr == deleg.ptr);
+        for(int i=0; i<delegates.length; i++)
+        {
+            if(delegates[i].ptr == deleg.ptr)
+            {
+                Array!delegateType n;
+                n.reserve(delegates.length - 1);
+                n ~= delegates[0 .. i];
+                n ~= delegates[i+1 .. $];
+                delegates = n;
+                return;
+            }
+        }
     }
     ///
     unittest
     {
-        void local(int a) {}
+        int z = 0;
+        void local(int a) { z = a; }
         Event!(int) evt;
         evt.subscribe(&local);
         evt.remove(&local);
+        evt(10);
+        assert(z == 0);
     }
 
     /// Call the event
-    void opCall(Args args)
+    void opCall(Args args) @trusted
     {
         foreach(deleg; delegates)
             deleg(args);
     }
+
+    ~this() @safe @nogc nothrow {}
 private:
-    delegateType[] delegates = new delegateType[0];
+    Array!delegateType delegates;// = new delegateType[0];
 }
 ///
 unittest
@@ -92,4 +110,12 @@ unittest
     b.someEvent.remove(&d.cbk);
     b.doAction(); // Removes delegate
     assert(d.val == 30); // No value change is expected
+}
+
+unittest
+{
+    void f(int a) {}
+    Event!int evt;
+    evt(10);
+    evt.remove(&f);
 }
