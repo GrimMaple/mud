@@ -34,6 +34,9 @@ struct OMemStream
     /// Read `size` bytes from the stream
     ubyte[] read(size_t size)
     {
+        if(pos + size > data.length)
+            size = data.length - pos;
+
         ubyte[] ret = data[pos .. pos+size];
         pos += size;
         return ret;
@@ -80,6 +83,16 @@ unittest
     assert(a == 10);
     assert(b == 11);
     assert(c == 14);
+    assert(os.eof);
+}
+
+// Unittest for reading more data than there is
+unittest
+{
+    ubyte[7] check = [10, 11, 0, 14, 0, 0, 0];
+    auto os = OMemStream(check);
+    auto r = os.read(10);
+    assert(r.length == 7);
     assert(os.eof);
 }
 
