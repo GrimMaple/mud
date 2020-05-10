@@ -170,6 +170,13 @@ struct IMemStream
             bytes.put(e);
         sz += val.length;
     }
+    /// ditto
+    void put(T : byte[])(T val)
+    {
+        foreach(e; val)
+            bytes.put(e);
+        sz += val.length;
+    }
 
 private:
     size_t sz = 0;

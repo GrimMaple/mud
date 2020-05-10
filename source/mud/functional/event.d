@@ -1,4 +1,4 @@
-module source.mud.functional.event;
+module mud.functional.event;
 
 import std.container.array;
 
