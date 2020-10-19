@@ -1,38 +1,38 @@
 module mud.memory.memstream;
 
-import mud.container.growing;
-
-@safe @nogc nothrow:
+private import mud.container.growing;
+private import std.exception : assertThrown;
+private import core.exception : AssertError;
 
 /// Output memory stream. Convenient for accessing elements in a byte array
 struct OMemStream
 {
-@nogc @safe nothrow:
     /// Check if the stream had ended
-    @property bool eof() { return pos >= data.length; }
+    @property bool eof() @nogc @safe nothrow { return pos >= data.length; }
     ///
-    unittest
+    @safe unittest
     {
         ubyte[1] data = [13];
-        OMemStream stream = OMemStream(data);
+        auto stream = OMemStream(data);
         stream.read!ubyte;
         assert(stream.eof);
     }
 
     /// Constructs new output memory stream from `data`
-    this(ubyte[] data)
+    @safe @nogc this(ubyte[] data) nothrow
     {
         this.data = data; 
     }
     ///
-    unittest
+    @safe unittest
     {
         ubyte[4] data = [0, 0, 0, 0];
-        OMemStream stream = OMemStream(data);
+        const stream = OMemStream(data);
     }
 
     /// Read `size` bytes from the stream
-    ubyte[] read(size_t size)
+    ubyte[] read(size_t size) @safe @nogc nothrow
+    in(!eof)
     {
         if(pos + size > data.length)
             size = data.length - pos;
@@ -42,16 +42,17 @@ struct OMemStream
         return ret;
     }
     ///
-    unittest
+    @trusted unittest
     {
         ubyte[4] data = [0, 1, 2, 3];
-        OMemStream stream = OMemStream(data);
-        auto res = stream.read(4);
+        auto stream = OMemStream(data);
+        const res = stream.read(4);
         assert(res == data);
+        assertThrown!AssertError(stream.read(1));
     }
 
     /// Read an element from stream. If there are no elements, returns default constructed `T`
-    T read(T)() @trusted
+    T read(T)() @trusted @nogc nothrow
     {
         if(pos + T.sizeof > data.length)
             return T();
@@ -60,10 +61,10 @@ struct OMemStream
         return val;
     }
     ///
-    unittest
+    @safe unittest
     {
         ubyte[1] data = [13];
-        OMemStream stream = OMemStream(data);
+        auto stream = OMemStream(data);
         assert(stream.read!ubyte == 13);
         assert(stream.read!ubyte == ubyte.init);
     }
@@ -77,9 +78,9 @@ unittest
 {
     ubyte[7] check = [10, 11, 0, 14, 0, 0, 0];
     auto os = OMemStream(check);
-    ubyte a = os.read!ubyte;
-    short b = os.read!short;
-    int c = os.read!int;
+    immutable a = os.read!ubyte;
+    immutable b = os.read!short;
+    immutable c = os.read!int;
     assert(a == 10);
     assert(b == 11);
     assert(c == 14);
@@ -87,11 +88,11 @@ unittest
 }
 
 // Unittest for reading more data than there is
-unittest
+@safe unittest
 {
     ubyte[7] check = [10, 11, 0, 14, 0, 0, 0];
     auto os = OMemStream(check);
-    auto r = os.read(10);
+    const r = os.read(10);
     assert(r.length == 7);
     assert(os.eof);
 }
@@ -99,20 +100,35 @@ unittest
 /// Input memory stream. Convenient for storing elements in a byte array
 struct IMemStream
 {
-@safe @nogc nothrow:
-    /// Returns underlying bytes
-    @property ubyte[] getBytes() { return bytes.get[0 .. sz]; }
-    ///
-    unittest
+    /// Returns a copy of underlying bytes
+    @property ubyte[] getBytes() @safe nothrow
     {
-        ubyte[1] check = [13];
+        ubyte[] ret = new ubyte[sz];
+        ret[0 .. sz] = bytes.get[0 .. sz];
+        return ret;
+    }
+    ///
+    @safe unittest
+    {
+        immutable ubyte[1] check = [13];
         IMemStream m;
         m.put!ubyte(13);
         assert(check == m.getBytes);
     }
 
+    /// Returns underlying bytes. MAY LEAK REFERENCES
+    @property ubyte[] peekBytes() @safe @nogc nothrow { return bytes.get[0 .. sz]; }
+    ///
+    @safe unittest
+    {
+        immutable ubyte[1] check = [13];
+        IMemStream m;
+        m.put!ubyte(13);
+        assert(check == m.peekBytes);
+    }
+
     /// Put an element of type `T` into the stream
-    void put(T)(T val) @trusted
+    void put(T)(T val) @trusted nothrow
     {
         ubyte *back = cast(ubyte*)&val;
         foreach(e; back[0 .. T.sizeof])
@@ -120,7 +136,7 @@ struct IMemStream
         sz += T.sizeof;
     }
     ///
-    unittest
+   @safe  unittest
     {
         IMemStream m;
         m.put!ubyte(13);
@@ -129,7 +145,7 @@ struct IMemStream
     }
 
     /// Put a string into the stream
-    void put(T : string)(T data)
+    void put(T : string)(T data) @safe @nogc nothrow
     {
         foreach(c; data)
         {
@@ -138,7 +154,7 @@ struct IMemStream
         }
     }
     ///
-    unittest
+    @safe unittest
     {
         string test = "Hello, world!";
         IMemStream stream;
@@ -148,14 +164,14 @@ struct IMemStream
     }
 
     /// Put a byte array into the stream
-    void put(T : ubyte[])(T data)
+    void put(T : ubyte[])(T data) @safe @nogc nothrow
     {
         foreach(e; data)
             bytes.put(e);
         sz += data.length;
     }
     ///
-    unittest
+    @safe unittest
     {
         ubyte[4] data = [10, 11, 12, 13];
         IMemStream stream;
@@ -164,14 +180,14 @@ struct IMemStream
             assert(stream.getBytes[i] == data[i]);
     }
     /// ditto
-    void put(T : const(ubyte[]))(T val)
+    void put(T : const(ubyte[]))(T val) @safe @nogc nothrow
     {
         foreach(e; val)
             bytes.put(e);
         sz += val.length;
     }
     /// ditto
-    void put(T : byte[])(T val)
+    void put(T : byte[])(T val) @safe @nogc nothrow
     {
         foreach(e; val)
             bytes.put(e);
@@ -183,7 +199,7 @@ private:
     GrowingContainer!ubyte bytes;
 }
 ///
-unittest
+@safe unittest
 {
     IMemStream m;
     m.put!ubyte(10);
