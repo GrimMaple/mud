@@ -2,21 +2,19 @@ module mud.container.growing;
 
 import std.experimental.allocator.mallocator;
 
-@safe @nogc nothrow:
-
 /// A container of primitives of type `T` that automatically grows when necessary. 
 /// The `size` parameter is the growth size
 struct GrowingContainer(T, size_t size = 1000, Allocator = Mallocator)
 if(__traits(isPOD, T) || __traits(isArithmetic, T))
 {
     /// Accesses element at index `index`
-    auto opIndex(size_t index)
+    auto opIndex(size_t index) @safe @nogc nothrow pure const
     in(index < pos)
     {
         return primitives[index];
     }
     ///
-    unittest
+    @safe unittest
     {
         GrowingContainer!int container;
         container.put(10);
@@ -24,9 +22,9 @@ if(__traits(isPOD, T) || __traits(isArithmetic, T))
     }
 
     /// Returns primitives as an array
-    @property ref T[] get() { return primitives; }
+    @property ref T[] get() @safe @nogc nothrow { return primitives; }
     ///
-    unittest
+    @safe unittest
     {
         GrowingContainer!int container;
         container.put(10);
@@ -34,9 +32,9 @@ if(__traits(isPOD, T) || __traits(isArithmetic, T))
     }
 
     /// Returns a slice of `T[]` that only has `count` primitives in it
-    @property T[] getPartial() { return primitives[0 .. pos]; }
+    @property T[] getPartial() @safe @nogc nothrow { return primitives[0 .. pos]; }
     ///
-    unittest
+    @safe unittest
     {
         GrowingContainer!int container;
         container.put(10);
@@ -44,9 +42,9 @@ if(__traits(isPOD, T) || __traits(isArithmetic, T))
     }
 
     /// Returns container's internal capacity
-    @property size_t capacity() { return sz; }
+    @property size_t capacity() @safe @nogc nothrow pure const { return sz; }
     ///
-    unittest
+    @safe unittest
     {
         GrowingContainer!(int, 10) container;
         assert(container.capacity == 0); // Container allocates lazily
@@ -55,14 +53,14 @@ if(__traits(isPOD, T) || __traits(isArithmetic, T))
     }
 
     /// Returns count of elements in this container
-    @property size_t count() { return pos; }
+    @property size_t length() @safe @nogc nothrow pure const { return pos; }
     ///
-    unittest
+    @safe unittest
     {
         GrowingContainer!int container;
-        assert(container.count == 0);
+        assert(container.length == 0);
         container.put(10);
-        assert(container.count == 1);
+        assert(container.length == 1);
     }
 
     /// Assigning to is disabled
@@ -72,7 +70,7 @@ if(__traits(isPOD, T) || __traits(isArithmetic, T))
     this(GrowingContainer!(T, size, Allocator) rhs) @disable;
 
     /// Put a new element `val` into the container
-    void put(T val) @trusted
+    void put(T val) @trusted @nogc nothrow
     {
         if(pos >= sz)
             grow();
@@ -80,7 +78,7 @@ if(__traits(isPOD, T) || __traits(isArithmetic, T))
         pos++;
     }
     ///
-    unittest
+    @safe unittest
     {
         GrowingContainer!int container;
         container.put(10);
@@ -88,27 +86,27 @@ if(__traits(isPOD, T) || __traits(isArithmetic, T))
     }
 
     /// Reset the current container to zero. Doesn't deallocate memory
-    void reset()
+    void reset() @safe @nogc nothrow
     {
         pos = 0;
     }
     ///
-    unittest
+    @safe unittest
     {
         GrowingContainer!int container;
         container.put(10);
-        assert(container.count != 0);
+        assert(container.length != 0);
         container.reset();
-        assert(container.count == 0);
+        assert(container.length == 0);
     }
 
-    ~this() @trusted
+    ~this() @trusted @nogc nothrow
     {
         Allocator.instance.deallocate(primitives);
     }
 
 private:
-    void grow() @trusted
+    void grow() @trusted @nogc nothrow
     {
         void[] r = cast(void[]) primitives;
         T[] newMem = cast(T[])Allocator.instance.allocate(T.sizeof * (sz + size));
@@ -127,9 +125,9 @@ private:
     GrowingContainer!(int, 10) container;
     assert(container.capacity == 0);
     container.put(10);
-    assert(container.capacity == 10 && container.count == 1);
+    assert(container.capacity == 10 && container.length == 1);
     foreach(i; 0 .. 10)
         container.put(i);
-    assert(container.capacity == 20 && container.count == 11);
+    assert(container.capacity == 20 && container.length == 11);
     assert(container[1] == 0 && container[0] == 10);
 }
