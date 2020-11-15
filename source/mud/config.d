@@ -51,15 +51,17 @@ unittest
     {
         @ConfigProperty() int a;
         @ConfigProperty() float b;
+        @ConfigProperty() string someString;
     }
     import std.stdio : writeln;
     import std.file : remove;
-    auto a = A(12, 42.0);
+    auto a = A(12, 42.0, "I shall contain=====stuff .123.123.1.23.");
     serializeConfig(a, "test.cfg");
     A test;
     deserializeConfig(test, "test.cfg");
     assert(test.a == a.a);
     assert(test.b == a.b);
+    assert(test.someString == a.someString);
     remove("test.cfg");
 }
 
@@ -68,7 +70,7 @@ void deserializeConfigString(T)(auto ref T t, string config)
 {
     import std.traits : getSymbolsByUDA, getUDAs;
     import std.conv : to;
-    import std.algorithm : map, each, strip, filter;
+    import std.algorithm : startsWith, findSplit, map, each, strip, filter;
     import std.array : split, replace;
     import std.stdio : writeln;
 
@@ -77,9 +79,12 @@ void deserializeConfigString(T)(auto ref T t, string config)
 
     foreach(x; strings)
     {
-        auto parts = x.split("=").map!(z => z.strip(' '));
-        assert(parts.length == 2);
-        values[parts[0]] = parts[1];
+        if(x.startsWith("#"))
+            continue;
+        immutable splitRes = x.findSplit("=");
+        auto parts = [splitRes[]].map!(z => z.strip(' '));
+        assert(parts.length == 3);
+        values[parts[0]] = parts[2];
     }
 
     static foreach(i; getSymbolsByUDA!(T, ConfigProperty))
@@ -113,7 +118,7 @@ unittest
         string c;
     }
     import std.file : write, remove;
-    write("test.cfg", "kek = 42\r\nb=12.0\r\n");
+    write("test.cfg", "#this is a comment\r\nkek = 42\r\nb=12.0\r\n");
     A a = A(42, 12.0, "test");
     deserializeConfig(a, "test.cfg");
     assert(a.a == 42);
