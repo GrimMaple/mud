@@ -1,4 +1,4 @@
-module source.mud.math;
+module mud.math;
 
 private import std.meta;
 

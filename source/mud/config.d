@@ -73,6 +73,7 @@ void deserializeConfigString(T)(auto ref T t, string config)
     import std.algorithm : startsWith, findSplit, map, each, strip, filter;
     import std.array : split, replace;
     import std.stdio : writeln;
+    import mud.functional : unpack;
 
     auto strings = config.replace("\r", "").split("\n").filter!(x => x != "");
     string[string] values;
@@ -81,8 +82,7 @@ void deserializeConfigString(T)(auto ref T t, string config)
     {
         if(x.startsWith("#"))
             continue;
-        immutable splitRes = x.findSplit("=");
-        auto parts = [splitRes[]].map!(z => z.strip(' '));
+        auto parts = x.findSplit("=").unpack.map!(z => z.strip(' '));
         assert(parts.length == 3);
         values[parts[0]] = parts[2];
     }
