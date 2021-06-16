@@ -18,7 +18,7 @@ if(is(T==class))
     return UPtr!(T, Allocator)(mem);
 }
 ///
-unittest
+@safe unittest
 {
     class A {}
     immutable auto unique = newUnique!A();
@@ -39,7 +39,7 @@ if(!is(T==class))
     return UPtr!(T*, Allocator)(mem);
 }
 ///
-unittest
+@safe unittest
 {
     auto unique = newUnique!int(42);
     assert((*unique.ptr) == 42);
@@ -124,7 +124,7 @@ if(is(T == class))
     return SPtr!(T,Allocator)(mem);
 }
 ///
-unittest
+@safe unittest
 {
     class A {}
     const auto sptr = newShared!A();
@@ -146,7 +146,7 @@ if(!is(T==class))
     return SPtr!(T*, Allocator)(mem);
 }
 ///
-unittest
+@safe unittest
 {
     auto sptr = newShared!int(42);
     assert((*sptr.ptr) == 42);

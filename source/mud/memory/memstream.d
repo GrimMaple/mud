@@ -74,7 +74,7 @@ private:
     ubyte[] data;
 }
 
-unittest
+@safe unittest
 {
     ubyte[7] check = [10, 11, 0, 14, 0, 0, 0];
     auto os = OMemStream(check);

@@ -8,7 +8,7 @@ struct ConfigProperty
 }
 
 /// Serialize `T` into a `string`
-string serializeConfigString(T)(auto ref T t)
+string serializeConfigString(T)(auto ref T t) @safe
 {
     import std.traits : getSymbolsByUDA, getUDAs;
     import std.conv : to;
@@ -39,13 +39,13 @@ string serializeConfigString(T)(auto ref T t)
 }
 
 /// Serialize `T` into file `path`
-void serializeConfig(T)(auto ref T t, string path)
+void serializeConfig(T)(auto ref T t, string path) @safe
 {
     import std.file : write;
     write(path, serializeConfigString(t));
 }
 ///
-unittest
+@safe unittest
 {
     struct A
     {
@@ -66,7 +66,7 @@ unittest
 }
 
 /// Deserialize `T` from string `config`
-void deserializeConfigString(T)(auto ref T t, string config)
+void deserializeConfigString(T)(auto ref T t, string config) @safe
 {
     import std.traits : getSymbolsByUDA, getUDAs;
     import std.conv : to;
@@ -103,13 +103,13 @@ void deserializeConfigString(T)(auto ref T t, string config)
 }
 
 /// Deserialize `T` from file `path`
-void deserializeConfig(T)(auto ref T t, string path)
+void deserializeConfig(T)(auto ref T t, string path) @safe
 {
     import std.file : readText;
     deserializeConfigString(t, readText(path));
 }
 ///
-unittest
+@safe unittest
 {
     struct A
     {

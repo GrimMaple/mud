@@ -9,7 +9,7 @@ template isSubclassOf(A, B) if(isClass!A && isClass!B)
     enum bool isSubclassOf = staticIndexOf!(B, BaseClassesTuple!(A)) != -1;
 }
 ///
-unittest
+@safe unittest
 {
     class A {}
     class B {}
@@ -27,7 +27,7 @@ template isClass(A)
     enum bool isClass = is(A == class);
 }
 ///
-unittest
+@safe unittest
 {
     struct A {}
     enum B { C = 1 }

@@ -11,7 +11,7 @@ if(__traits(isArithmetic, T))
     return cast(T)(1.0 / (1 + exp(cast(double)-t)));
 }
 ///
-unittest
+@safe unittest
 {
     assert(logisticSigmoid(1000.0) == 1.0);
     assert(logisticSigmoid(-1000.0) == 0.0);

@@ -120,7 +120,7 @@ private:
     size_t sz = 0;
 }
 ///
-@trusted unittest
+@safe unittest
 {
     GrowingContainer!(int, 10) container;
     assert(container.capacity == 0);
