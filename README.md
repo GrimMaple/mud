@@ -4,7 +4,7 @@ Utility code I use in my projects
 Mostly gists and bits, but contains a few things you may consider useful
 
 ## Featured
-*mud/memory/smartpointers.d*  
+_**mud/memory/smartpointers.d**_  
 Provides basic smartpointers for d:
 ```d
 class A {}
@@ -16,7 +16,7 @@ class A {}
 const auto sptr = newShared!A();
 ```
 
-*mud/config.d*  
+_**mud/config.d**_  
 Provides basic configuration storing/restoring via UDAs:
 ```d
 struct A
@@ -30,7 +30,7 @@ serializeConfig(a, "test.cfg");
 deserializeConfig(a, "test.cfg");
 ```
 
-*mud/functional/event.d*  
+_**mud/functional/event.d**_  
 C#-like events!
 ```d
 void f(int) {}
