@@ -55,14 +55,15 @@ void serializeConfig(T)(auto ref T t, string path) @safe
     }
     import std.stdio : writeln;
     import std.file : remove;
+    immutable fileName = "testSerialize.cfg";
     auto a = A(12, 42.0, "I shall contain=====stuff .123.123.1.23.");
-    serializeConfig(a, "test.cfg");
+    serializeConfig(a, fileName);
     A test;
-    deserializeConfig(test, "test.cfg");
+    deserializeConfig(test, fileName);
     assert(test.a == a.a);
     assert(test.b == a.b);
     assert(test.someString == a.someString);
-    remove("test.cfg");
+    remove(fileName);
 }
 
 /// Deserialize `T` from string `config`
@@ -118,11 +119,12 @@ void deserializeConfig(T)(auto ref T t, string path) @safe
         string c;
     }
     import std.file : write, remove;
-    write("test.cfg", "#this is a comment\r\nkek = 42\r\nb=12.0\r\n");
+    immutable fileName = "testDeserialize.cfg";
+    write(fileName, "#this is a comment\r\nkek = 42\r\nb=12.0\r\n");
     A a = A(42, 12.0, "test");
-    deserializeConfig(a, "test.cfg");
+    deserializeConfig(a, fileName);
     assert(a.a == 42);
     assert(a.b == 12.0);
     assert(a.c == "test");
-    remove("test.cfg");
+    remove(fileName);
 }
