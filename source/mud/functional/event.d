@@ -76,9 +76,9 @@ struct Event(Args...)
     }
 
     /// Clears out all subscribers
-    void empty() @safe
+    void empty() @trusted
     {
-        delegates.empty();
+        delegates.clear();
     }
 
     ~this() @safe @nogc nothrow {}
