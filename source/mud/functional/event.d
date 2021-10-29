@@ -75,6 +75,12 @@ struct Event(Args...)
             deleg(args);
     }
 
+    /// Clears out all subscribers
+    void empty() @safe
+    {
+        delegates.empty();
+    }
+
     ~this() @safe @nogc nothrow {}
 private:
     Array!delegateType delegates;
