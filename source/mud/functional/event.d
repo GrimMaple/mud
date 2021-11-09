@@ -8,7 +8,7 @@ struct Event(Args...)
     alias delegateType = void delegate(Args);
 
     /// Convenience subscription overload
-    void opOpAssign(string s)(delegateType deleg) @safe @nogc nothrow if(s == "~")
+    void opOpAssign(string s)(delegateType deleg) @safe nothrow if(s == "~")
     {
         subscribe(deleg);
     }
@@ -21,9 +21,9 @@ struct Event(Args...)
     }
 
     /// Subscribe to event
-    void subscribe(delegateType deleg) @trusted @nogc nothrow
+    void subscribe(delegateType deleg) @safe nothrow
     {
-        delegates.insert(deleg);
+        delegates ~= deleg;
     }
     ///
     unittest
@@ -40,17 +40,13 @@ struct Event(Args...)
     }
 
     /// Remove a subscriber
-    void remove(delegateType deleg) @trusted @nogc nothrow
+    void remove(delegateType deleg) @trusted nothrow
     {
         for(int i=0; i<delegates.length; i++)
         {
             if(delegates[i].ptr == deleg.ptr)
             {
-                Array!delegateType n;
-                n.reserve(delegates.length - 1);
-                n ~= delegates[0 .. i];
-                n ~= delegates[i+1 .. $];
-                delegates = n;
+                delegates = delegates[0 .. i] ~ delegates[i + 1 .. $];
                 return;
             }
         }
@@ -78,12 +74,12 @@ struct Event(Args...)
     /// Clears out all subscribers
     void empty() @trusted
     {
-        delegates.clear();
+        delegates = new delegateType[0];
     }
 
     ~this() @safe @nogc nothrow {}
 private:
-    Array!delegateType delegates;
+    delegateType[] delegates;
 }
 ///
 unittest
