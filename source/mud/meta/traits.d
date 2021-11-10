@@ -1,4 +1,4 @@
-module source.mud.meta.traits;
+module mud.meta.traits;
 
 private import std.traits;
 
