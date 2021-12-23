@@ -1,6 +1,7 @@
 module mud.math;
 
-private import std.meta;
+import std.meta;
+import std.math : PI;
 
 /// Logistic sigmoid function, useful for neural networks.
 /// Returns 1 / (1 + e^(-t))
@@ -43,4 +44,30 @@ if(__traits(isArithmetic, T))
 {
     assert(!isEven(1));
     assert(isEven(2));
+}
+
+/// Converts `deg` in degrees to radians
+real toRadians(in real deg) @safe @nogc nothrow pure
+{
+    return (PI * deg)/180;
+}
+///
+@safe @nogc unittest
+{
+    assert(toRadians(180) == PI);
+    assert(toRadians(0) == 0);
+    assert(toRadians(90) == PI / 2);
+}
+
+/// Converts `rads` in radians to degrees
+real toDegrees(in real rads) @safe @nogc nothrow pure
+{
+    return (rads * 180) / PI;
+}
+///
+@safe @nogc unittest
+{
+    assert(toDegrees(PI) == 180);
+    assert(toDegrees(0) == 0);
+    assert(toDegrees(PI / 2) == 90);
 }
