@@ -28,7 +28,7 @@ struct JSONField
  * any fields that you want to be serializable. Automatically maps marked fields to 
  * corresponding JSON types. Any field not marked with `JSONField` is not serialized.
  */
-auto serializeJSON(T)(auto ref T obj)
+JSONValue serializeJSON(T)(auto ref T obj)
 {
     static if(isPointer!T)
         return serializeJSON!(PointerTarget!T)(*obj);
@@ -44,7 +44,12 @@ auto serializeJSON(T)(auto ref T obj)
                 enum uda = JSONField(getUDAs!(prop, JSONField)[0].name);
             string name = uda.name == "" ? prop.stringof : uda.name;
             auto value = __traits(child, obj, prop);
-            ret[name] = serializeAutoObj(value);
+            static if(isArray!(typeof(prop)))
+            {
+                if(value.length > 0)
+                    ret[name] = serializeAutoObj(value);
+            }
+            else ret[name] = serializeAutoObj(value);
         }}
         return ret;
     }
@@ -68,8 +73,13 @@ auto serializeJSON(T)(auto ref T obj)
  *
  * Throws: $(LREF Exception) if fails to create an instance of any class
  */
-auto deserializeJSON(T)(JSONValue root)
+T deserializeJSON(T)(JSONValue root)
 {
+    static if(is(T == class) || isPointer!T)
+    {
+        if(root.isNull)
+            return null;
+    }
     T ret;
     static if(is(T == class))
     {
@@ -86,7 +96,8 @@ auto deserializeJSON(T)(JSONValue root)
             enum uda = JSONField(getUDAs!(prop, JSONField)[0].name);
 
         string name = uda.name == "" ? prop.stringof : uda.name;
-        __traits(child, ret, prop) = deserializeAutoObj!(typeof(prop))(root[name]);
+        if(name in root)
+            __traits(child, ret, prop) = deserializeAutoObj!(typeof(prop))(root[name]);
     }}
     return ret;
 }
@@ -104,7 +115,7 @@ auto deserializeJSON(T)(JSONValue root)
     assert(test.a == 123 && test.b == "Hello");
 }
 
-private auto serializeAutoObj(T)(auto ref T obj)
+private JSONValue serializeAutoObj(T)(auto ref T obj)
 {
     static if(isJSONNumber!T || isJSONString!T || is(T == bool))
         return JSONValue(obj);
@@ -120,7 +131,7 @@ private auto serializeAutoObj(T)(auto ref T obj)
 
 }
 
-private auto serializeJSONArray(T)(auto ref T obj)
+private JSONValue serializeJSONArray(T)(auto ref T obj)
 {
     JSONValue v = JSONValue(new JSONValue[0]);
     foreach(i; obj)
@@ -128,7 +139,7 @@ private auto serializeJSONArray(T)(auto ref T obj)
     return v;
 }
 
-private auto deserializeAutoObj(T)(auto ref JSONValue value)
+private T deserializeAutoObj(T)(auto ref JSONValue value)
 {
     static if(is(T == struct))
         return deserializeJSON!T(value);
@@ -152,7 +163,7 @@ private auto deserializeAutoObj(T)(auto ref JSONValue value)
     else return value.get!T;
 }
 
-private auto deserializeJSONArray(T)(auto ref JSONValue value)
+private T deserializeJSONArray(T)(auto ref JSONValue value)
 {
     T ret;
     static if(!__traits(isStaticArray, T))
