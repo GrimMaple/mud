@@ -21,7 +21,7 @@ struct OMemStream
     /// Constructs new output memory stream from `data`
     @safe @nogc this(ubyte[] data) nothrow
     {
-        this.data = data; 
+        this.data = data;
     }
     ///
     @safe unittest
@@ -192,6 +192,16 @@ struct IMemStream
         foreach(e; val)
             bytes.put(e);
         sz += val.length;
+    }
+    ///
+    void put(T : void[])(T val) @trusted @nogc nothrow
+    {
+        put(cast(ubyte[])val);
+    }
+    ///
+    void put(T : const(void[]))(T val) @trusted @nogc nothrow
+    {
+        put(cast(const(ubyte[]))val);
     }
 
 private:
