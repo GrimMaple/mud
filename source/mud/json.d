@@ -5,8 +5,8 @@ import std.traits : getSymbolsByUDA, getUDAs, isPointer, isArray, PointerTarget,
 import std.conv : to;
 
 /**
- * A UDA for JSON serialization. 
- * 
+ * A UDA for JSON serialization.
+ *
  * Use on any field to mark them as serializable to JSON.
  *
  * Note: Class type fields cannot be marked as a JSONField
@@ -24,8 +24,8 @@ struct JSONField
 }
 
 /**
- * Serializes an object to a `JSONValue`. To make this work, use `JSONField` UDA on 
- * any fields that you want to be serializable. Automatically maps marked fields to 
+ * Serializes an object to a `JSONValue`. To make this work, use `JSONField` UDA on
+ * any fields that you want to be serializable. Automatically maps marked fields to
  * corresponding JSON types. Any field not marked with `JSONField` is not serialized.
  */
 JSONValue serializeJSON(T)(auto ref T obj)
@@ -68,7 +68,7 @@ JSONValue serializeJSON(T)(auto ref T obj)
     assert(val["other"].get!string == "Hello, world");
 }
 
-/** 
+/**
  * Deserializes a `JSONValue` to `T`
  *
  * Throws: $(LREF Exception) if fails to create an instance of any class
@@ -242,11 +242,11 @@ unittest
         @JSONField Test classField = new Test();
     }
 
-    import std.stdio : writeln;
+    // import std.stdio : writeln;
     foo orig = foo();
     auto val = serializeJSON(foo());
     string res = toJSON(val);
-    writeln(res);
+    // writeln(res);
     foo back = deserializeJSON!foo(parseJSON(res));
     assert(back.a == orig.a);
     assert(back.floating == orig.floating);

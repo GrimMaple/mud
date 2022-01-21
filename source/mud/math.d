@@ -46,28 +46,68 @@ if(__traits(isArithmetic, T))
     assert(isEven(2));
 }
 
-/// Converts `deg` in degrees to radians
-real toRadians(in real deg) @safe @nogc nothrow pure
+/**
+ * Converts an angle value in $(HTTP en.wikipedia.org/wiki/Radian, radians) to degrees
+ *
+ * Params:
+ *      deg = angle in degrees
+ * Returns:
+ *      angle in radians
+ */
+pragma(inline, true)
+real toRadians(real deg) @safe @nogc nothrow pure
 {
     return (PI * deg)/180;
+}
+///ditto
+pragma(inline, true)
+double toRadians(double deg) @safe @nogc nothrow pure
+{
+    return cast(double)toRadians(cast(real)deg);
+}
+///ditto
+pragma(inline, true)
+float toRadians(float deg) @safe @nogc nothrow pure
+{
+    return cast(float)toRadians(cast(real)deg);
 }
 ///
 @safe @nogc unittest
 {
-    assert(toRadians(180) == PI);
-    assert(toRadians(0) == 0);
-    assert(toRadians(90) == PI / 2);
+    assert(toRadians(180.0) == PI);
+    assert(toRadians(0.0) == 0);
+    assert(toRadians(90.0) == PI / 2);
 }
 
-/// Converts `rads` in radians to degrees
-real toDegrees(in real rads) @safe @nogc nothrow pure
+/**
+ * Converts an angle value in degrees to $(HTTP en.wikipedia.org/wiki/Radian, radians)
+ *
+ * Params:
+ *      rads = angle in radians
+ * Returns:
+ *      angle in degrees
+ */
+pragma(inline, true)
+real toDegrees(real rads) @safe @nogc nothrow pure
 {
     return (rads * 180) / PI;
+}
+///ditto
+pragma(inline, true)
+double toDegrees(double rads) @safe @nogc nothrow pure
+{
+    return cast(double)toDegrees(cast(real)rads);
+}
+///ditto
+pragma(inline, true)
+float toDegrees(float rads) @safe @nogc nothrow pure
+{
+    return cast(float)toDegrees(cast(real)rads);
 }
 ///
 @safe @nogc unittest
 {
     assert(toDegrees(PI) == 180);
-    assert(toDegrees(0) == 0);
+    assert(toDegrees(.0f) == 0);
     assert(toDegrees(PI / 2) == 90);
 }
