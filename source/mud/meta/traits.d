@@ -1,3 +1,7 @@
+/**
+ * This module contains various traits
+ */
+
 module mud.meta.traits;
 
 private import std.traits;

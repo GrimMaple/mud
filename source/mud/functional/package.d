@@ -1,3 +1,7 @@
+/**
+ * This module contains various functional helpers
+ */
+
 module mud.functional;
 
 private import std.typecons : isTuple;

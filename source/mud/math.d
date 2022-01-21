@@ -1,10 +1,17 @@
+/**
+ * This module contains various math-related functions
+ */
+
 module mud.math;
 
 import std.meta;
 import std.math : PI;
 
-/// Logistic sigmoid function, useful for neural networks.
-/// Returns 1 / (1 + e^(-t))
+/**
+ * Logistic sigmoid function, useful for neural networks.
+ *
+ * Returns: 1 / (1 + e^(-t))
+ */
 T logisticSigmoid(T)(T t) @safe @nogc nothrow pure
 if(__traits(isArithmetic, T))
 {

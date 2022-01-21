@@ -1,3 +1,7 @@
+/**
+ * This module contains JSON serialization and deserialization functionality
+ */
+
 module mud.json;
 
 import std.json;
@@ -196,7 +200,7 @@ private template isJSONString(T)
     assert(isJSONString!string && isJSONString!wstring && isJSONString!dstring);
 }
 
-/// For UT purposes
+/// For UT purposes, because declaring a class in a unittest make it impossible to `new` it
 private class Test
 {
     @JSONField int a;
