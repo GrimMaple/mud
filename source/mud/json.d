@@ -8,6 +8,8 @@ import std.json;
 import std.traits : getSymbolsByUDA, getUDAs, isPointer, isArray, PointerTarget, fullyQualifiedName;
 import std.conv : to;
 
+import std.exception : assertThrown, assertNotThrown;
+
 /**
  * A UDA for JSON serialization.
  *
@@ -18,13 +20,27 @@ import std.conv : to;
 struct JSONField
 {
     ///
-    this(string n)
+    this(string n) @safe nothrow
     {
         name = n;
     }
 
-    /// Controls the resulting field name in JSON
+    ///
+    this(string n, bool req) @safe nothrow
+    {
+        name = n;
+        required = req;
+    }
+
+    /**
+     * Controls the field name in JSON.
+     *
+     * If set to "" (default), the field name is the same as in D code.
+     */
     string name;
+
+    /// When set to true, deserialiation will throw if it is unable to deserialize this field
+    bool required;
 }
 
 /**
@@ -45,13 +61,15 @@ JSONValue serializeJSON(T)(auto ref T obj)
             static if(is(getUDAs!(prop, JSONField)[0] == struct))
                 enum uda = JSONField("");
             else
-                enum uda = JSONField(getUDAs!(prop, JSONField)[0].name);
+                enum uda = getUDAs!(prop, JSONField)[0];
             string name = uda.name == "" ? prop.stringof : uda.name;
             auto value = __traits(child, obj, prop);
             static if(isArray!(typeof(prop)))
             {
                 if(value.length > 0)
                     ret[name] = serializeAutoObj(value);
+                else if(uda.required)
+                    ret[name] = JSONValue(null);
             }
             else ret[name] = serializeAutoObj(value);
         }}
@@ -76,9 +94,11 @@ JSONValue serializeJSON(T)(auto ref T obj)
  * Deserializes a `JSONValue` to `T`
  *
  * Throws: $(LREF Exception) if fails to create an instance of any class
+ *         $(LREF Exception) if a required $(LREF JSONField) is missing
  */
 T deserializeJSON(T)(JSONValue root)
 {
+    import std.stdio : writeln;
     static if(is(T == class) || isPointer!T)
     {
         if(root.isNull)
@@ -97,9 +117,14 @@ T deserializeJSON(T)(JSONValue root)
         static if(is(getUDAs!(prop, JSONField)[0] == struct))
             enum uda = JSONField("");
         else
-            enum uda = JSONField(getUDAs!(prop, JSONField)[0].name);
+            enum uda = getUDAs!(prop, JSONField)[0];
 
-        string name = uda.name == "" ? prop.stringof : uda.name;
+        enum name = uda.name == "" ? prop.stringof : uda.name;
+        static if(uda.required)
+        {
+            if((name in root) is null && uda.required)
+                throw new Exception("Missing required field \"" ~ name ~ "\" in JSON!");
+        }
         if(name in root)
             __traits(child, ret, prop) = deserializeAutoObj!(typeof(prop))(root[name]);
     }}
@@ -108,7 +133,7 @@ T deserializeJSON(T)(JSONValue root)
 ///
 @safe unittest
 {
-    string json = `{"a": 123, "b": "Hello"}`;
+    immutable json = `{"a": 123, "b": "Hello"}`;
     struct Test
     {
         @JSONField int a;
@@ -117,6 +142,17 @@ T deserializeJSON(T)(JSONValue root)
 
     immutable test = deserializeJSON!Test(parseJSON(json));
     assert(test.a == 123 && test.b == "Hello");
+}
+
+@safe unittest
+{
+    immutable json = `{"a": 123}`;
+    struct A { @JSONField("b", true) int b; }
+    struct B { @JSONField int a; }
+
+    auto res = parseJSON(json);
+    assertThrown(deserializeJSON!A(res));
+    assertNotThrown(deserializeJSON!B(res));
 }
 
 private JSONValue serializeAutoObj(T)(auto ref T obj)
@@ -217,7 +253,7 @@ private class Test
 
 unittest
 {
-    struct other
+    struct Other
     {
         @JSONField
         string name;
@@ -239,10 +275,10 @@ unittest
         @JSONField int[3] arr = [1, 2, 3];
         @JSONField string name = "Hello";
         @JSONField("flag") bool check = true;
-        @JSONField() other object;
-        @JSONField other[3] arrayOfObjects;
-        @JSONField other* nullable = null;
-        @JSONField other* structField = new other("t", 1);
+        @JSONField() Other object;
+        @JSONField Other[3] arrayOfObjects;
+        @JSONField Other* nullable = null;
+        @JSONField Other* structField = new Other("t", 1);
         @JSONField Test classField = new Test();
     }
 
