@@ -14,22 +14,13 @@ import std.exception : assertThrown, assertNotThrown;
  * A UDA for JSON serialization.
  *
  * Use on any field to mark them as serializable to JSON.
- *
- * Note: Class type fields cannot be marked as a JSONField
  */
-struct JSONField
+struct jsonField
 {
     ///
     this(string n) @safe nothrow
     {
         name = n;
-    }
-
-    ///
-    this(string n, bool req) @safe nothrow
-    {
-        name = n;
-        required = req;
     }
 
     /**
@@ -38,15 +29,19 @@ struct JSONField
      * If set to "" (default), the field name is the same as in D code.
      */
     string name;
-
-    /// When set to true, deserialiation will throw if it is unable to deserialize this field
-    bool required;
 }
 
 /**
- * Serializes an object to a `JSONValue`. To make this work, use `JSONField` UDA on
+ * A UDA to mark a JSON field as required for deserialization
+ *
+ * When applied to a property, deserialization will throw if field is not found in json
+ */
+struct jsonRequired { }
+
+/**
+ * Serializes an object to a `JSONValue`. To make this work, use `jsonField` UDA on
  * any fields that you want to be serializable. Automatically maps marked fields to
- * corresponding JSON types. Any field not marked with `JSONField` is not serialized.
+ * corresponding JSON types. Any field not marked with `jsonField` is not serialized.
  */
 JSONValue serializeJSON(T)(auto ref T obj)
 {
@@ -55,20 +50,25 @@ JSONValue serializeJSON(T)(auto ref T obj)
     else
     {
         JSONValue ret;
-        static foreach(prop; getSymbolsByUDA!(T, JSONField))
+        static foreach(prop; getSymbolsByUDA!(T, jsonField))
         {{
-            static assert(getUDAs!(prop, JSONField).length == 1, "Only 1 JSONField UDA is allowed per property");
-            static if(is(getUDAs!(prop, JSONField)[0] == struct))
-                enum uda = JSONField("");
+            static assert(getUDAs!(prop, jsonField).length == 1,
+                "Only 1 jsonField UDA is allowed per property See " ~ prop.stringof ~ ".");
+            static assert(getUDAs!(prop, jsonRequired).length < 2,
+                "Only 1 jsonRequired UDA is allowed per property. See " ~ prop.stringof ~ ".");
+
+            static if(is(getUDAs!(prop, jsonField)[0] == struct))
+                enum uda = jsonField("");
             else
-                enum uda = getUDAs!(prop, JSONField)[0];
+                enum uda = getUDAs!(prop, jsonField)[0];
+            enum bool required = getUDAs!(prop, jsonRequired).length == 1;
             string name = uda.name == "" ? prop.stringof : uda.name;
             auto value = __traits(child, obj, prop);
             static if(isArray!(typeof(prop)))
             {
                 if(value.length > 0)
                     ret[name] = serializeAutoObj(value);
-                else if(uda.required)
+                else if(required)
                     ret[name] = JSONValue(null);
             }
             else ret[name] = serializeAutoObj(value);
@@ -81,8 +81,8 @@ JSONValue serializeJSON(T)(auto ref T obj)
 {
     struct Test
     {
-        @JSONField int test = 43;
-        @JSONField string other = "Hello, world";
+        @jsonField int test = 43;
+        @jsonField string other = "Hello, world";
     }
 
     auto val = serializeJSON(Test());
@@ -94,7 +94,7 @@ JSONValue serializeJSON(T)(auto ref T obj)
  * Deserializes a `JSONValue` to `T`
  *
  * Throws: $(LREF Exception) if fails to create an instance of any class
- *         $(LREF Exception) if a required $(LREF JSONField) is missing
+ *         $(LREF Exception) if a required $(LREF jsonField) is missing
  */
 T deserializeJSON(T)(JSONValue root)
 {
@@ -111,18 +111,22 @@ T deserializeJSON(T)(JSONValue root)
         if(ret is null)
             throw new Exception("Could not create an instance of " ~ fullyQualifiedName!T);
     }
-    static foreach(prop; getSymbolsByUDA!(T, JSONField))
+    static foreach(prop; getSymbolsByUDA!(T, jsonField))
     {{
-        static assert(getUDAs!(prop, JSONField).length == 1, "Only 1 JSONField UDA is allowed per property");
-        static if(is(getUDAs!(prop, JSONField)[0] == struct))
-            enum uda = JSONField("");
+        static assert(getUDAs!(prop, jsonField).length == 1,
+            "Only 1 jsonField UDA is allowed per property See " ~ prop.stringof ~ ".");
+        static assert(getUDAs!(prop, jsonRequired).length < 2,
+            "Only 1 jsonRequired UDA is allowed per property. See " ~ prop.stringof ~ ".");
+        static if(is(getUDAs!(prop, jsonField)[0] == struct))
+            enum uda = jsonField("");
         else
-            enum uda = getUDAs!(prop, JSONField)[0];
+            enum uda = getUDAs!(prop, jsonField)[0];
 
         enum name = uda.name == "" ? prop.stringof : uda.name;
-        static if(uda.required)
+        enum bool required = getUDAs!(prop, jsonRequired).length == 1;
+        static if(required)
         {
-            if((name in root) is null && uda.required)
+            if((name in root) is null && required)
                 throw new Exception("Missing required field \"" ~ name ~ "\" in JSON!");
         }
         if(name in root)
@@ -136,8 +140,8 @@ T deserializeJSON(T)(JSONValue root)
     immutable json = `{"a": 123, "b": "Hello"}`;
     struct Test
     {
-        @JSONField int a;
-        @JSONField string b;
+        @jsonField int a;
+        @jsonField string b;
     }
 
     immutable test = deserializeJSON!Test(parseJSON(json));
@@ -147,8 +151,8 @@ T deserializeJSON(T)(JSONValue root)
 @safe unittest
 {
     immutable json = `{"a": 123}`;
-    struct A { @JSONField("b", true) int b; }
-    struct B { @JSONField int a; }
+    struct A { @jsonField("b") @jsonRequired int b; }
+    struct B { @jsonField int a; }
 
     auto res = parseJSON(json);
     assertThrown(deserializeJSON!A(res));
@@ -239,8 +243,8 @@ private template isJSONString(T)
 /// For UT purposes, because declaring a class in a unittest make it impossible to `new` it
 private class Test
 {
-    @JSONField int a;
-    @JSONField string b;
+    @jsonField int a;
+    @jsonField string b;
 }
 
 // Test case for deserializing classes
@@ -255,31 +259,31 @@ unittest
 {
     struct Other
     {
-        @JSONField
+        @jsonField
         string name;
 
-        @JSONField
+        @jsonField
         int id;
     }
 
     static class TTT
     {
-        @JSONField string o = "o";
+        @jsonField string o = "o";
     }
 
     struct foo
     {
         // Works with or without brackets
-        @JSONField int a = 123;
-        @JSONField() double floating = 123;
-        @JSONField int[3] arr = [1, 2, 3];
-        @JSONField string name = "Hello";
-        @JSONField("flag") bool check = true;
-        @JSONField() Other object;
-        @JSONField Other[3] arrayOfObjects;
-        @JSONField Other* nullable = null;
-        @JSONField Other* structField = new Other("t", 1);
-        @JSONField Test classField = new Test();
+        @jsonField int a = 123;
+        @jsonField() double floating = 123;
+        @jsonField int[3] arr = [1, 2, 3];
+        @jsonField string name = "Hello";
+        @jsonField("flag") bool check = true;
+        @jsonField() Other object;
+        @jsonField Other[3] arrayOfObjects;
+        @jsonField Other* nullable = null;
+        @jsonField Other* structField = new Other("t", 1);
+        @jsonField Test classField = new Test();
     }
 
     // import std.stdio : writeln;
