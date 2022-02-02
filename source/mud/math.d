@@ -81,9 +81,10 @@ float toRadians(float deg) @safe @nogc nothrow pure
 ///
 @safe @nogc unittest
 {
-    assert(toRadians(180.0) == PI);
-    assert(toRadians(0.0) == 0);
-    assert(toRadians(90.0) == PI / 2);
+    import std.math : isClose;
+    assert(isClose(toRadians(180.0), PI));
+    assert(isClose(toRadians(0.0), 0));
+    assert(isClose(toRadians(90.0), PI / 2));
 }
 
 /**
@@ -114,7 +115,8 @@ float toDegrees(float rads) @safe @nogc nothrow pure
 ///
 @safe @nogc unittest
 {
-    assert(toDegrees(PI) == 180);
-    assert(toDegrees(.0f) == 0);
-    assert(toDegrees(PI / 2) == 90);
+    import std.math : isClose;
+    assert(isClose(toDegrees(PI), 180));
+    assert(isClose(toDegrees(0.0), 0));
+    assert(isClose(toDegrees(PI / 2), 90));
 }

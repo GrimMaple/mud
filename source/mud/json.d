@@ -98,9 +98,7 @@ JSONValue serializeJSON(T)(auto ref T obj)
         int inaccessible = 32;
     }
 
-    import std;
     auto val = serializeJSON(Test());
-    writeln(toJSON(val));
     assert(val["test"].get!int == 43);
     assert(val["other"].get!string == "Hello, world");
     assert(val["foo"].get!int == 32);
@@ -373,11 +371,9 @@ unittest
         @jsonField Test classField = new Test();
     }
 
-    // import std.stdio : writeln;
     foo orig = foo();
     auto val = serializeJSON(foo());
     string res = toJSON(val);
-    // writeln(res);
     foo back = deserializeJSON!foo(parseJSON(res));
     assert(back.a == orig.a);
     assert(back.floating == orig.floating);
