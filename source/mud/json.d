@@ -5,7 +5,7 @@
 module mud.json;
 
 import std.json;
-import std.traits : getSymbolsByUDA, getUDAs, isPointer, isArray, PointerTarget, fullyQualifiedName;
+import std.traits;
 import std.conv : to;
 
 import std.exception : assertThrown, assertNotThrown;
@@ -238,6 +238,40 @@ private template isJSONString(T)
 @safe @nogc unittest
 {
     assert(isJSONString!string && isJSONString!wstring && isJSONString!dstring);
+}
+
+private template isSetterFunction(T)
+{
+    enum bool isSetterFunction = isFunction!T && ((Parameters!T).length == 1) && is(ReturnType!T == void);
+}
+///
+@safe @nogc unittest
+{
+    void foo(int b) { }
+    int fee() { return 0; }
+    int bar(int b) { return b; }
+    void baz(int a, int b) { }
+    assert(isSetterFunction!(FunctionTypeOf!foo));
+    assert(!isSetterFunction!(FunctionTypeOf!fee));
+    assert(!isSetterFunction!(FunctionTypeOf!bar));
+    assert(!isSetterFunction!(FunctionTypeOf!baz));
+}
+
+private template isGetterFunction(T)
+{
+    enum bool isGetterFunction = isFunction!T && ((Parameters!T).length == 0) && !is(ReturnType!T == void);
+}
+///
+@safe @nogc unittest
+{
+    void foo(int b) { }
+    int fee() { return 0; }
+    int bar(int b) { return b; }
+    void baz(int a, int b) { }
+    assert(isGetterFunction!(FunctionTypeOf!fee));
+    assert(!isGetterFunction!(FunctionTypeOf!foo));
+    assert(!isGetterFunction!(FunctionTypeOf!bar));
+    assert(!isGetterFunction!(FunctionTypeOf!baz));
 }
 
 /// For UT purposes, because declaring a class in a unittest make it impossible to `new` it
