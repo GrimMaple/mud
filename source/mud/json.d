@@ -13,7 +13,8 @@ import std.exception : assertThrown, assertNotThrown;
 /**
  * A UDA for JSON serialization.
  *
- * Use on any field to mark them as serializable to JSON.
+ * Use on any field to mark them as serializable to JSON. Only field and getters/setters can
+ * be marked as `jsonField`s.
  */
 struct jsonField
 {
@@ -34,7 +35,7 @@ struct jsonField
 /**
  * A UDA to mark a JSON field as required for deserialization
  *
- * When applied to a property, deserialization will throw if field is not found in json
+ * When applied to a field, deserialization will throw if field is not found in json
  */
 struct jsonRequired { }
 
@@ -52,26 +53,33 @@ JSONValue serializeJSON(T)(auto ref T obj)
         JSONValue ret;
         static foreach(prop; getSymbolsByUDA!(T, jsonField))
         {{
+            // Sanity checks
             static assert(getUDAs!(prop, jsonField).length == 1,
                 "Only 1 jsonField UDA is allowed per property See " ~ prop.stringof ~ ".");
             static assert(getUDAs!(prop, jsonRequired).length < 2,
                 "Only 1 jsonRequired UDA is allowed per property. See " ~ prop.stringof ~ ".");
-
+            static assert(!isFunction!prop ||
+                (isGetterFunction!(FunctionTypeOf!prop) || isSetterFunction!(FunctionTypeOf!prop)),
+                "Function " ~ prop.stringof ~ " is not a getter or setter");
             static if(is(getUDAs!(prop, jsonField)[0] == struct))
                 enum uda = jsonField("");
             else
                 enum uda = getUDAs!(prop, jsonField)[0];
-            enum bool required = getUDAs!(prop, jsonRequired).length == 1;
-            string name = uda.name == "" ? prop.stringof : uda.name;
-            auto value = __traits(child, obj, prop);
-            static if(isArray!(typeof(prop)))
+
+            static if(!isFunction!prop || isGetterFunction!(FunctionTypeOf!prop))
             {
-                if(value.length > 0)
-                    ret[name] = serializeAutoObj(value);
-                else if(required)
-                    ret[name] = JSONValue(null);
+                enum bool required = getUDAs!(prop, jsonRequired).length == 1;
+                enum name = uda.name == "" ? __traits(identifier, prop) : uda.name;
+                auto value = __traits(child, obj, prop);
+                static if(isArray!(typeof(prop)))
+                {
+                    if(value.length > 0)
+                        ret[name] = serializeAutoObj(value);
+                    else if(required)
+                        ret[name] = JSONValue(null);
+                }
+                else ret[name] = serializeAutoObj(value);
             }
-            else ret[name] = serializeAutoObj(value);
         }}
         return ret;
     }
@@ -83,11 +91,19 @@ JSONValue serializeJSON(T)(auto ref T obj)
     {
         @jsonField int test = 43;
         @jsonField string other = "Hello, world";
+
+        @jsonField int foo() { return inaccessible; }
+        @jsonField void foo(int val) { inaccessible = val; }
+    private:
+        int inaccessible = 32;
     }
 
+    import std;
     auto val = serializeJSON(Test());
+    writeln(toJSON(val));
     assert(val["test"].get!int == 43);
     assert(val["other"].get!string == "Hello, world");
+    assert(val["foo"].get!int == 32);
 }
 
 /**
@@ -113,24 +129,38 @@ T deserializeJSON(T)(JSONValue root)
     }
     static foreach(prop; getSymbolsByUDA!(T, jsonField))
     {{
+        // Sanity checks
         static assert(getUDAs!(prop, jsonField).length == 1,
             "Only 1 jsonField UDA is allowed per property See " ~ prop.stringof ~ ".");
         static assert(getUDAs!(prop, jsonRequired).length < 2,
             "Only 1 jsonRequired UDA is allowed per property. See " ~ prop.stringof ~ ".");
-        static if(is(getUDAs!(prop, jsonField)[0] == struct))
-            enum uda = jsonField("");
-        else
-            enum uda = getUDAs!(prop, jsonField)[0];
+        static assert(!isFunction!prop ||
+            (isGetterFunction!(FunctionTypeOf!prop) || isSetterFunction!(FunctionTypeOf!prop)),
+            "Function " ~ prop.stringof ~ " is not a getter or setter");
 
-        enum name = uda.name == "" ? prop.stringof : uda.name;
-        enum bool required = getUDAs!(prop, jsonRequired).length == 1;
-        static if(required)
+        static if(!isFunction!prop || isSetterFunction!(FunctionTypeOf!prop))
         {
-            if((name in root) is null && required)
-                throw new Exception("Missing required field \"" ~ name ~ "\" in JSON!");
+
+            static if(is(getUDAs!(prop, jsonField)[0] == struct))
+                enum uda = jsonField("");
+            else
+                enum uda = getUDAs!(prop, jsonField)[0];
+
+            enum name = uda.name == "" ? __traits(identifier, prop) : uda.name;
+            enum bool required = getUDAs!(prop, jsonRequired).length == 1;
+            static if(required)
+            {
+                if((name in root) is null && required)
+                    throw new Exception("Missing required field \"" ~ name ~ "\" in JSON!");
+            }
+            if(name in root)
+            {
+                static if(isFunction!prop)
+                    __traits(child, ret, prop) = deserializeAutoObj!(Parameters!prop[0])(root[name]);
+                else
+                    __traits(child, ret, prop) = deserializeAutoObj!(typeof(prop))(root[name]);
+            }
         }
-        if(name in root)
-            __traits(child, ret, prop) = deserializeAutoObj!(typeof(prop))(root[name]);
     }}
     return ret;
 }
@@ -138,6 +168,7 @@ T deserializeJSON(T)(JSONValue root)
 @safe unittest
 {
     immutable json = `{"a": 123, "b": "Hello"}`;
+
     struct Test
     {
         @jsonField int a;
@@ -235,7 +266,7 @@ private template isJSONString(T)
     enum bool isJSONString = is(T == string) || is(T == wstring) || is(T == dstring);
 }
 ///
-@safe @nogc unittest
+@safe unittest
 {
     assert(isJSONString!string && isJSONString!wstring && isJSONString!dstring);
 }
@@ -245,7 +276,7 @@ private template isSetterFunction(T)
     enum bool isSetterFunction = isFunction!T && ((Parameters!T).length == 1) && is(ReturnType!T == void);
 }
 ///
-@safe @nogc unittest
+@safe unittest
 {
     void foo(int b) { }
     int fee() { return 0; }
@@ -262,7 +293,7 @@ private template isGetterFunction(T)
     enum bool isGetterFunction = isFunction!T && ((Parameters!T).length == 0) && !is(ReturnType!T == void);
 }
 ///
-@safe @nogc unittest
+@safe unittest
 {
     void foo(int b) { }
     int fee() { return 0; }
@@ -274,11 +305,33 @@ private template isGetterFunction(T)
     assert(!isGetterFunction!(FunctionTypeOf!baz));
 }
 
-/// For UT purposes, because declaring a class in a unittest make it impossible to `new` it
-private class Test
+// For UT purposes. Declaring those in a unittest causes frame pointer errors
+version(unittest)
 {
-    @jsonField int a;
-    @jsonField string b;
+    private struct TestStruct
+    {
+        @jsonField int a;
+        @jsonField string b;
+
+        @jsonField void foo(int val) @safe { inaccessible = val; }
+        @jsonField int foo() @safe const { return inaccessible; }
+    private:
+        int inaccessible;
+    }
+
+    private class Test
+    {
+        @jsonField int a;
+        @jsonField string b;
+    }
+}
+
+// Test case for deserialization with getters
+@safe unittest
+{
+    string json = `{"a": 123, "b": "Hello", "foo": 345}`;
+    auto t = deserializeJSON!TestStruct(parseJSON(json));
+    assert(t.a == 123 && t.b == "Hello" && t.foo == 345);
 }
 
 // Test case for deserializing classes
