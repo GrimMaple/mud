@@ -13,12 +13,17 @@ import std.exception : assertThrown, assertNotThrown;
 /**
  * A UDA for JSON serialization.
  *
- * Use on any field to mark them as serializable to JSON. Only field and getters/setters can
+ * Use on any field to mark it as serializable to JSON. Only fields and getters/setters can
  * be marked as `jsonField`s.
  */
 struct jsonField
 {
-    ///
+    /**
+     * Constructs new `jsonField`
+     *
+     * Params
+     *     n = field name in json
+     */
     this(string n) @safe nothrow
     {
         name = n;
@@ -35,12 +40,13 @@ struct jsonField
 /**
  * A UDA to mark a JSON field as required for deserialization
  *
- * When applied to a field, deserialization will throw if field is not found in json
+ * When applied to a field, deserialization will throw if field is not found in json,
+ * and serialization will produce `null` for `null` fields
  */
 struct jsonRequired { }
 
 /**
- * Serializes an object to a `JSONValue`. To make this work, use `jsonField` UDA on
+ * Serializes an object to a $(LREF JSONValue). To make this work, use $(LREF jsonField) UDA on
  * any fields that you want to be serializable. Automatically maps marked fields to
  * corresponding JSON types. Any field not marked with `jsonField` is not serialized.
  */
@@ -60,7 +66,7 @@ JSONValue serializeJSON(T)(auto ref T obj)
                 "Only 1 jsonRequired UDA is allowed per property. See " ~ prop.stringof ~ ".");
             static assert(!isFunction!prop ||
                 (isGetterFunction!(FunctionTypeOf!prop) || isSetterFunction!(FunctionTypeOf!prop)),
-                "Function " ~ prop.stringof ~ " is not a getter or setter");
+                "Function " ~ prop.stringof ~ " is not a getter or a setter");
             static if(is(getUDAs!(prop, jsonField)[0] == struct))
                 enum uda = jsonField("");
             else
