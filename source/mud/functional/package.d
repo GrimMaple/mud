@@ -40,3 +40,18 @@ if(isInputRange!(Range))
     assert(first(r[], (int i) { return i % 2 == 0; }) == 2);
     assert(first(r[], (int i) { return 1 > 10; }) == int.init);
 }
+
+/// Returns first element in `inRange`. If no elements found, returns `init`
+auto firstOrInit(Range)(Range inRange)
+if(isInputRange!Range)
+{
+    foreach(e; inRange)
+        return e;
+    return (ElementType!(Range)).init;
+}
+///
+@safe @nogc unittest
+{
+    int[6] r = [1, 2, 3, 4, 5, 6];
+    assert(firstOrInit(r[]) == 1);
+}

@@ -45,3 +45,12 @@ private:
     assert(rng.next(0, 100) == uniform!"[)"(0, 100, def));
     assert(rng.nextInclusive(0, 100) == uniform!"[]"(0, 100, def));
 }
+
+Range randomShuffle(Range)(Range r, IRandom rng)
+{
+    import std.algorithm.mutation : swapAt;
+    const n = r.length;
+    foreach(i; 0 .. n)
+        r.swapAt(i, i + rng.next(0, cast(uint)(n - i)));
+    return r;
+}
