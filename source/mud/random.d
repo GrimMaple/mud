@@ -7,6 +7,7 @@ interface IRandom
 {
     uint next(uint min, uint max) @safe;
     uint nextInclusive(uint min, uint max) @safe;
+    bool nextBool() @safe;
 }
 
 /// Creates an instance of a common `IRandom` from a selected Random Engine `T`
@@ -25,6 +26,11 @@ class RandomEngine(T) if(isUniformRNG!T) : IRandom
     uint nextInclusive(uint min, uint max) @safe
     {
         return uniform!"[]"(min, max, engine);
+    }
+
+    bool nextBool() @safe
+    {
+        return nextInclusive(0, 1) == 1;
     }
 
 private:
