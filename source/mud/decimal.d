@@ -5,6 +5,7 @@ import std.conv : to;
 import std.math : pow, floor;
 import std.traits : isIntegral;
 import std.array : appender;
+import std.format : format;
 
 /// A big Decimal. Literally, a Big Int with a fixed point
 struct BigDec(int prec) if(prec > 0)
@@ -46,7 +47,10 @@ struct BigDec(int prec) if(prec > 0)
 
     int opCmp(R)(const R other) const @safe
     {
-        return value.opCmp(other);
+        static if(is(R == BigDec!prec) || is(R == BigInt))
+            return value.opCmp(other.value);
+        else
+            return value.opCmp(other);
     }
 
     string toString() const @safe
@@ -54,7 +58,7 @@ struct BigDec(int prec) if(prec > 0)
         auto app = appender!string;
         app ~= to!string(value / bigDenom);
         app ~= ".";
-        app ~= to!string(value % denom);
+        app ~= to!string(format("%0" ~ prec.to!string ~ "d", value % denom));
         return app[];
     }
 
@@ -88,4 +92,6 @@ struct BigDec(int prec) if(prec > 0)
     assert(a > 0);
     a += Number(100);
     assert(a == b);
+    assert(to!string(Number(0.1)) == "0.10");
+    assert(to!string(Number(0.01)) == "0.01");
 }
