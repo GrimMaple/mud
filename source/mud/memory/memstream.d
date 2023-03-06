@@ -212,7 +212,7 @@ private:
 ///
 @safe unittest
 {
-    IMemStream m;
+    IMemStream!() m;
     m.put!ubyte(10);
     m.put!short(11);
     m.put!int(14);
