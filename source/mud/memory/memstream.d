@@ -98,7 +98,8 @@ private:
 }
 
 /// Input memory stream. Convenient for storing elements in a byte array
-struct IMemStream
+/// default size is 100KB
+struct IMemStream(size_t back_sz = 100 * 1024)
 {
     /// Returns a copy of underlying bytes
     @property ubyte[] getBytes() @safe nothrow
@@ -206,7 +207,7 @@ struct IMemStream
 
 private:
     size_t sz = 0;
-    GrowingContainer!ubyte bytes;
+    GrowingContainer!(ubyte, back_sz) bytes;
 }
 ///
 @safe unittest
