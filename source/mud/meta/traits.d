@@ -4,7 +4,7 @@
 
 module mud.meta.traits;
 
-private import std.traits;
+import std.traits;
 
 /// Is `A` a subclass of `B`
 template isSubclassOf(A, B) if(isClass!A && isClass!B)
