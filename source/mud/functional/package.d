@@ -82,6 +82,7 @@ OutType as(OutType, InType)(InType input) @safe @nogc pure nothrow
     assert(b.as!A !is null);
     static assert(!__traits(compiles, 10.as!double == 10));
     static assert(!__traits(compiles, (new C).as!A));
+    assert(b.as!Object !is null);
 
     // Compile-time error: `C` must be a subclass of `A`
     // scope C c = new C;

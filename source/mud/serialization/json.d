@@ -1,41 +1,12 @@
-/**
- * This module contains JSON serialization and deserialization functionality
- */
+module mud.serialization.json;
 
-module mud.json;
-
-import std.json;
 import std.traits;
 import std.conv : to;
 
 import std.exception : assertThrown, assertNotThrown;
+import std.json;
 
-/**
- * A UDA for JSON serialization.
- *
- * Use on any field to mark it as serializable to JSON. Only fields and getters/setters can
- * be marked as `jsonField`s.
- */
-struct jsonField
-{
-    /**
-     * Constructs new `jsonField`
-     *
-     * Params
-     *     n = field name in json
-     */
-    this(string n) @safe nothrow
-    {
-        name = n;
-    }
-
-    /**
-     * Controls the field name in JSON.
-     *
-     * If set to "" (default), the field name is the same as in D code.
-     */
-    string name;
-}
+import mud.serialization;
 
 /**
  * A UDA to mark a JSON field as required for deserialization
@@ -57,20 +28,9 @@ JSONValue serializeJSON(T)(auto ref T obj)
     else
     {
         JSONValue ret;
-        static foreach(prop; getSymbolsByUDA!(T, jsonField))
+        static foreach(prop; serializableFields!T)
         {{
-            // Sanity checks
-            static assert(getUDAs!(prop, jsonField).length == 1,
-                "Only 1 jsonField UDA is allowed per property See " ~ prop.stringof ~ ".");
-            static assert(getUDAs!(prop, jsonRequired).length < 2,
-                "Only 1 jsonRequired UDA is allowed per property. See " ~ prop.stringof ~ ".");
-            static assert(!isFunction!prop ||
-                (isGetterFunction!(FunctionTypeOf!prop) || isSetterFunction!(FunctionTypeOf!prop)),
-                "Function " ~ prop.stringof ~ " is not a getter or a setter");
-            static if(is(getUDAs!(prop, jsonField)[0] == struct))
-                enum uda = jsonField("");
-            else
-                enum uda = getUDAs!(prop, jsonField)[0];
+            enum uda = getSerializableName!prop;
 
             static if(!isFunction!prop || isGetterFunction!(FunctionTypeOf!prop))
             {
@@ -95,11 +55,11 @@ JSONValue serializeJSON(T)(auto ref T obj)
 {
     struct Test
     {
-        @jsonField int test = 43;
-        @jsonField string other = "Hello, world";
+        @serializable int test = 43;
+        @serializable string other = "Hello, world";
 
-        @jsonField int foo() { return inaccessible; }
-        @jsonField void foo(int val) { inaccessible = val; }
+        @serializable int foo() { return inaccessible; }
+        @serializable void foo(int val) { inaccessible = val; }
     private:
         int inaccessible = 32;
     }
@@ -131,24 +91,15 @@ T deserializeJSON(T)(JSONValue root)
         if(ret is null)
             throw new Exception("Could not create an instance of " ~ fullyQualifiedName!T);
     }
-    static foreach(prop; getSymbolsByUDA!(T, jsonField))
+    static foreach(prop; serializableFields!T)
     {{
-        // Sanity checks
-        static assert(getUDAs!(prop, jsonField).length == 1,
-            "Only 1 jsonField UDA is allowed per property See " ~ prop.stringof ~ ".");
-        static assert(getUDAs!(prop, jsonRequired).length < 2,
-            "Only 1 jsonRequired UDA is allowed per property. See " ~ prop.stringof ~ ".");
-        static assert(!isFunction!prop ||
-            (isGetterFunction!(FunctionTypeOf!prop) || isSetterFunction!(FunctionTypeOf!prop)),
-            "Function " ~ prop.stringof ~ " is not a getter or setter");
-
         static if(!isFunction!prop || isSetterFunction!(FunctionTypeOf!prop))
         {
-
-            static if(is(getUDAs!(prop, jsonField)[0] == struct))
-                enum uda = jsonField("");
+            enum uda = getSerializableName!prop;
+            /*static if(is(getUDAs!(prop, serializable)[0] == struct))
+                enum uda = serializable("");
             else
-                enum uda = getUDAs!(prop, jsonField)[0];
+                enum uda = getUDAs!(prop, serializable)[0];*/
 
             enum name = uda.name == "" ? __traits(identifier, prop) : uda.name;
             enum bool required = getUDAs!(prop, jsonRequired).length == 1;
@@ -175,8 +126,8 @@ T deserializeJSON(T)(JSONValue root)
 
     struct Test
     {
-        @jsonField int a;
-        @jsonField string b;
+        @serializable int a;
+        @serializable string b;
     }
 
     immutable test = deserializeJSON!Test(parseJSON(json));
@@ -186,8 +137,8 @@ T deserializeJSON(T)(JSONValue root)
 @safe unittest
 {
     immutable json = `{"a": 123}`;
-    struct A { @jsonField("b") @jsonRequired int b; }
-    struct B { @jsonField int a; }
+    struct A { @serializable("b") @jsonRequired int b; }
+    struct B { @serializable int a; }
 
     auto res = parseJSON(json);
     assertThrown(deserializeJSON!A(res));
@@ -275,58 +226,24 @@ private template isJSONString(T)
     assert(isJSONString!string && isJSONString!wstring && isJSONString!dstring);
 }
 
-private template isSetterFunction(T)
-{
-    enum bool isSetterFunction = isFunction!T && ((Parameters!T).length == 1) && is(ReturnType!T == void);
-}
-///
-@safe unittest
-{
-    void foo(int b) { }
-    int fee() { return 0; }
-    int bar(int b) { return b; }
-    void baz(int a, int b) { }
-    assert(isSetterFunction!(FunctionTypeOf!foo));
-    assert(!isSetterFunction!(FunctionTypeOf!fee));
-    assert(!isSetterFunction!(FunctionTypeOf!bar));
-    assert(!isSetterFunction!(FunctionTypeOf!baz));
-}
-
-private template isGetterFunction(T)
-{
-    enum bool isGetterFunction = isFunction!T && ((Parameters!T).length == 0) && !is(ReturnType!T == void);
-}
-///
-@safe unittest
-{
-    void foo(int b) { }
-    int fee() { return 0; }
-    int bar(int b) { return b; }
-    void baz(int a, int b) { }
-    assert(isGetterFunction!(FunctionTypeOf!fee));
-    assert(!isGetterFunction!(FunctionTypeOf!foo));
-    assert(!isGetterFunction!(FunctionTypeOf!bar));
-    assert(!isGetterFunction!(FunctionTypeOf!baz));
-}
-
 // For UT purposes. Declaring those in a unittest causes frame pointer errors
 version(unittest)
 {
     private struct TestStruct
     {
-        @jsonField int a;
-        @jsonField string b;
+        @serializable int a;
+        @serializable string b;
 
-        @jsonField void foo(int val) @safe { inaccessible = val; }
-        @jsonField int foo() @safe const { return inaccessible; }
+        @serializable void foo(int val) @safe { inaccessible = val; }
+        @serializable int foo() @safe const { return inaccessible; }
     private:
         int inaccessible;
     }
 
     private class Test
     {
-        @jsonField int a;
-        @jsonField string b;
+        @serializable int a;
+        @serializable string b;
     }
 }
 
@@ -350,31 +267,31 @@ unittest
 {
     struct Other
     {
-        @jsonField
+        @serializable
         string name;
 
-        @jsonField
+        @serializable
         int id;
     }
 
     static class TTT
     {
-        @jsonField string o = "o";
+        @serializable string o = "o";
     }
 
     struct foo
     {
         // Works with or without brackets
-        @jsonField int a = 123;
-        @jsonField() double floating = 123;
-        @jsonField int[3] arr = [1, 2, 3];
-        @jsonField string name = "Hello";
-        @jsonField("flag") bool check = true;
-        @jsonField() Other object;
-        @jsonField Other[3] arrayOfObjects;
-        @jsonField Other* nullable = null;
-        @jsonField Other* structField = new Other("t", 1);
-        @jsonField Test classField = new Test();
+        @serializable int a = 123;
+        @serializable() double floating = 123;
+        @serializable int[3] arr = [1, 2, 3];
+        @serializable string name = "Hello";
+        @serializable("flag") bool check = true;
+        @serializable() Other object;
+        @serializable Other[3] arrayOfObjects;
+        @serializable Other* nullable = null;
+        @serializable Other* structField = new Other("t", 1);
+        @serializable Test classField = new Test();
     }
 
     foo orig = foo();
@@ -384,4 +301,27 @@ unittest
     assert(back.a == orig.a);
     assert(back.floating == orig.floating);
     assert(back.structField.id == orig.structField.id);
+}
+
+// Special tests to check compile-time messages
+unittest
+{
+    struct TooMany
+    {
+        @serializable @serializable int a;
+    }
+
+    struct NotSetter
+    {
+        @serializable void b(int a, int b);
+    }
+
+    TooMany a;
+    NotSetter b;
+
+    // Error: Only 1 UDA is allowed per property
+    // serializeJSON(a);
+
+    // Error: not a getter or a setter
+    // serializeJSON(b);
 }
