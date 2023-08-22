@@ -17,9 +17,9 @@ import mud.serialization;
 struct jsonRequired { }
 
 /**
- * Serializes an object to a $(LREF JSONValue). To make this work, use $(LREF jsonField) UDA on
+ * Serializes an object to a $(LREF JSONValue). To make this work, use $(LREF serializable) UDA on
  * any fields that you want to be serializable. Automatically maps marked fields to
- * corresponding JSON types. Any field not marked with `jsonField` is not serialized.
+ * corresponding JSON types. Any field not marked with $(LREF serializable) is not serialized.
  */
 JSONValue serializeJSON(T)(auto ref T obj)
 {
@@ -28,25 +28,19 @@ JSONValue serializeJSON(T)(auto ref T obj)
     else
     {
         JSONValue ret;
-        static foreach(prop; serializableFields!T)
-        {{
-            enum uda = getSerializableName!prop;
-
-            static if(!isFunction!prop || isGetterFunction!(FunctionTypeOf!prop))
+        foreach(alias prop; serializablesReadable!T)
+        {
+            enum name = getSerializableName!prop;
+            auto value = __traits(child, obj, prop);
+            static if(isArray!(typeof(prop)))
             {
-                enum bool required = getUDAs!(prop, jsonRequired).length == 1;
-                enum name = uda.name == "" ? __traits(identifier, prop) : uda.name;
-                auto value = __traits(child, obj, prop);
-                static if(isArray!(typeof(prop)))
-                {
-                    if(value.length > 0)
-                        ret[name] = serializeAutoObj(value);
-                    else if(required)
-                        ret[name] = JSONValue(null);
-                }
-                else ret[name] = serializeAutoObj(value);
+                if(value.length > 0)
+                    ret[name] = serializeAutoObj(value);
+                else if(isJSONRequired!prop)
+                    ret[name] = JSONValue(null);
             }
-        }}
+            else ret[name] = serializeAutoObj(value);
+        }
         return ret;
     }
 }
@@ -71,12 +65,36 @@ JSONValue serializeJSON(T)(auto ref T obj)
 }
 
 /**
- * Deserializes a `JSONValue` to `T`
+ * Serialize `T` into a JSON string
+ */
+string serializeToJSONString(T)(auto ref T obj)
+{
+    auto val = serializeJSON(obj);
+    return toJSON(val);
+}
+///
+@safe unittest
+{
+    struct Test
+    {
+        @serializable int test = 43;
+        @serializable string other = "Hello, world";
+
+        @serializable int foo() { return inaccessible; }
+        @serializable void foo(int val) { inaccessible = val; }
+    private:
+        int inaccessible = 32;
+    }
+
+    assert(serializeToJSONString(Test()) == `{"foo":32,"other":"Hello, world","test":43}`);
+}
+/**
+ * Deserializes a $(LREF JSONValue) to `T`
  *
  * Throws: $(LREF Exception) if fails to create an instance of any class
  *         $(LREF Exception) if a required $(LREF jsonField) is missing
  */
-T deserializeJSON(T)(JSONValue root)
+T deserializeJSON(T)(auto ref JSONValue root)
 {
     import std.stdio : writeln;
     static if(is(T == class) || isPointer!T)
@@ -91,32 +109,22 @@ T deserializeJSON(T)(JSONValue root)
         if(ret is null)
             throw new Exception("Could not create an instance of " ~ fullyQualifiedName!T);
     }
-    static foreach(prop; serializableFields!T)
-    {{
-        static if(!isFunction!prop || isSetterFunction!(FunctionTypeOf!prop))
+    foreach(alias prop; serializablesWriteable!T)
+    {
+        enum name = getSerializableName!prop;
+        static if(isJSONRequired!prop)
         {
-            enum uda = getSerializableName!prop;
-            /*static if(is(getUDAs!(prop, serializable)[0] == struct))
-                enum uda = serializable("");
-            else
-                enum uda = getUDAs!(prop, serializable)[0];*/
-
-            enum name = uda.name == "" ? __traits(identifier, prop) : uda.name;
-            enum bool required = getUDAs!(prop, jsonRequired).length == 1;
-            static if(required)
-            {
-                if((name in root) is null && required)
-                    throw new Exception("Missing required field \"" ~ name ~ "\" in JSON!");
-            }
-            if(name in root)
-            {
-                static if(isFunction!prop)
-                    __traits(child, ret, prop) = deserializeAutoObj!(Parameters!prop[0])(root[name]);
-                else
-                    __traits(child, ret, prop) = deserializeAutoObj!(typeof(prop))(root[name]);
-            }
+            if((name in root) is null && isJSONRequired!prop)
+                throw new Exception("Missing required field \"" ~ name ~ "\" in JSON!");
         }
-    }}
+        if(name in root)
+        {
+            static if(isFunction!prop)
+                __traits(child, ret, prop) = deserializeAutoObj!(Parameters!prop[0])(root[name]);
+            else
+                __traits(child, ret, prop) = deserializeAutoObj!(typeof(prop))(root[name]);
+        }
+    }
     return ret;
 }
 ///
@@ -131,6 +139,28 @@ T deserializeJSON(T)(JSONValue root)
     }
 
     immutable test = deserializeJSON!Test(parseJSON(json));
+    assert(test.a == 123 && test.b == "Hello");
+}
+
+/**
+ * Deserialize a JSON string into `T`
+ */
+T deserializeJSONFromString(T)(string json)
+{
+    return deserializeJSON!T(parseJSON(json));
+}
+///
+@safe unittest
+{
+    immutable json = `{"a": 123, "b": "Hello"}`;
+
+    struct Test
+    {
+        @serializable int a;
+        @serializable string b;
+    }
+
+    immutable test = deserializeJSONFromString!Test(json);
     assert(test.a == 123 && test.b == "Hello");
 }
 
@@ -203,6 +233,11 @@ private T deserializeJSONArray(T)(auto ref JSONValue value)
     return ret;
 }
 
+private template isJSONRequired(alias T)
+{
+    enum bool isJSONRequired = getUDAs!(T, jsonRequired).length > 0;
+}
+
 private template isJSONNumber(T)
 {
     enum bool isJSONNumber = __traits(isScalar, T) && !isPointer!T && !is(T == bool);
@@ -263,6 +298,7 @@ version(unittest)
     assert(t.a == 123 && t.b == "Hello");
 }
 
+// Global unittest for everything
 unittest
 {
     struct Other
@@ -279,7 +315,7 @@ unittest
         @serializable string o = "o";
     }
 
-    struct foo
+    struct Foo
     {
         // Works with or without brackets
         @serializable int a = 123;
@@ -294,10 +330,10 @@ unittest
         @serializable Test classField = new Test();
     }
 
-    foo orig = foo();
-    auto val = serializeJSON(foo());
+    auto orig = Foo();
+    auto val = serializeJSON(Foo());
     string res = toJSON(val);
-    foo back = deserializeJSON!foo(parseJSON(res));
+    auto back = deserializeJSON!Foo(parseJSON(res));
     assert(back.a == orig.a);
     assert(back.floating == orig.floating);
     assert(back.structField.id == orig.structField.id);
@@ -319,9 +355,17 @@ unittest
     TooMany a;
     NotSetter b;
 
-    // Error: Only 1 UDA is allowed per property
-    // serializeJSON(a);
+    assert(!__traits(compiles, serializeJSON(a))); // Error: Only 1 UDA is allowed per property
+    assert(!__traits(compiles, serializeJSON(b))); // Error: not a getter or a setter
+}
 
-    // Error: not a getter or a setter
-    // serializeJSON(b);
+// Test for using return value
+@safe unittest
+{
+    struct A
+    {
+        @serializable int a;
+    }
+
+    A a = deserializeJSON!A(parseJSON("{\"a\": 123}"));
 }

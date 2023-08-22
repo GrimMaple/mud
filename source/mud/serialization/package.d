@@ -6,7 +6,7 @@ import std.traits;
 /**
  * A UDA for marking fields as serializable.
  *
- * Use on any field to mark it as serializable to JSON. Only fields and getters/setters can
+ * Use on any field to mark it as serializable. Only fields and getters/setters can
  * be marked as `serializeable`.
  */
 struct serializable
@@ -30,6 +30,9 @@ struct serializable
     string name;
 }
 
+/**
+ * Retreive all fields of type `T` that are $(LREF serializable)
+ */
 template serializableFields(T)
 {
     alias serializableFields = getSymbolsByUDA!(T, serializable);
@@ -46,11 +49,47 @@ template serializableFields(T)
         }
     }
 }
-
-/// Retreive all writeable serializables. This includes properties and setters
-template serializablesWriteable(T)
+unittest
 {
-    alias serializableWriteable = Filter!(isSerializableWriteable, serializableFields!T);
+    struct A
+    {
+        @serializable int a;
+        @serializable int foo() { return 1; }
+        @serializable void bar(int a) { b = a; }
+        int b;
+    }
+}
+
+template isSerializable(alias T)
+{
+    enum bool isSerializable = getUDAs!(T, serializable).length == 1;
+}
+unittest
+{
+    struct A
+    {
+        @serializable int a;
+        int b;
+    }
+
+    assert(isSerializable!(A.a));
+    assert(!isSerializable!(A.b));
+}
+
+/// Retreive all writeable serializables for `T`. This includes properties and setters.
+template serializablesWriteable(alias T)
+{
+    alias serializablesWriteable = Filter!(isSerializableWriteable, serializableFields!T);
+}
+///
+@safe unittest
+{
+    static struct A
+    {
+        @serializable void a(int value) { _a = value; }
+        @serializable int b;
+        private int _a;
+    }
 }
 ///
 @safe unittest
@@ -60,40 +99,49 @@ template serializablesWriteable(T)
         @serializable int a;
         @serializable void foo(int s);
     }
-
-    import std.stdio : writeln;
-    static foreach(aaa; serializableFields!A)
-        writeln(fullyQualifiedName!aaa);
-
-        writeln();
-
-    writeln(isSerializableWriteable!(A.a));
-    writeln(isSerializableWriteable!(A.foo));
-
-    /*static foreach(aaa; serializablesReadable!A)
-        writeln(fullyQualifiedName!aaa);
-
-        writeln();
-
-    static foreach(aaa; serializablesWriteable!A)
-        writeln(fullyQualifiedName!aaa);*/
 }
 
 /// Retreive all readable serializables. This includes properties and getters
-template serializablesReadable(T)
+template serializablesReadable(alias T)
 {
-    alias serializableWriteable = Filter!(isSerializableReadable, serializableFields!T);
+    alias serializablesReadable = Filter!(isSerializableReadable, serializableFields!T);
+}
+///
+@safe unittest
+{
+    static struct A
+    {
+        @serializable void a(int value) { _a = value; }
+        @serializable int b;
+        private int _a;
+    }
 }
 
-private template isSerializableReadable(alias T)
+template isSerializableReadable(alias T) if(isSerializable!T)
 {
-    static if(isFunction!T)
+    static if (isFunction!T)
         enum bool isSerializableReadable = isGetterFunction!T;
     else
         enum bool isSerializableReadable = true;
 }
+@safe @nogc unittest
+{
+    struct A
+    {
+        @serializable void foo(int a) { }
+        @serializable int bar() { return 1; }
+        @serializable int a;
+        int b;
+    }
 
-private template isSerializableWriteable(alias T)
+    assert(isSerializableReadable!(A.a));
+    assert(isSerializableReadable!(A.bar));
+    assert(!isSerializableReadable!(A.foo));
+}
+
+
+
+template isSerializableWriteable(alias T) if(isSerializable!T)
 {
     static if(isFunction!T)
         enum bool isSerializableWriteable = isSetterFunction!T;
@@ -104,12 +152,12 @@ private template isSerializableWriteable(alias T)
 template getSerializableName(alias prop)
 {
     static if(is(getUDAs!(prop, serializable)[0] == struct))
-        enum getSerializableName = serializable("");
+        enum string getSerializableName = __traits(identifier, prop);
     else
-        enum getSerializableName = getUDAs!(prop, serializable)[0];
+        enum string getSerializableName = getUDAs!(prop, serializable)[0].name == "" ? __traits(identifier, prop) : getUDAs!(prop, serializable)[0].name ;
 }
 
-/*private*/ template isSetterFunction(alias T)
+template isSetterFunction(alias T)
 {
     enum bool isSetterFunction = isFunction!T && ((Parameters!T).length == 1) && is(ReturnType!T == void);
 }
