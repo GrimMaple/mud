@@ -21,14 +21,14 @@ struct jsonRequired { }
  * any fields that you want to be serializable. Automatically maps marked fields to
  * corresponding JSON types. Any field not marked with $(LREF serializable) is not serialized.
  */
-JSONValue serializeJSON(T)(auto ref T obj)
+JSONValue serializeJSON(T)(auto ref T obj) @safe
 {
     static if(isPointer!T)
         return serializeJSON!(PointerTarget!T)(*obj);
     else
     {
         JSONValue ret;
-        foreach(alias prop; serializablesReadable!T)
+        foreach(alias prop; readableSerializables!T)
         {
             enum name = getSerializableName!prop;
             auto value = __traits(child, obj, prop);
@@ -67,7 +67,7 @@ JSONValue serializeJSON(T)(auto ref T obj)
 /**
  * Serialize `T` into a JSON string
  */
-string serializeToJSONString(T)(auto ref T obj)
+string serializeToJSONString(T)(auto ref T obj) @safe
 {
     auto val = serializeJSON(obj);
     return toJSON(val);
@@ -91,10 +91,10 @@ string serializeToJSONString(T)(auto ref T obj)
 /**
  * Deserializes a $(LREF JSONValue) to `T`
  *
- * Throws: $(LREF Exception) if fails to create an instance of any class
- *         $(LREF Exception) if a required $(LREF jsonField) is missing
+ * Throws: $(LREF SerializationException) if fails to create an instance of any class
+ *         $(LREF SerializationException) if a $(LREF jsonRequired) $(LREF serializable) is missing
  */
-T deserializeJSON(T)(auto ref JSONValue root)
+T deserializeJSON(T)(auto ref JSONValue root) @safe
 {
     import std.stdio : writeln;
     static if(is(T == class) || isPointer!T)
@@ -107,15 +107,15 @@ T deserializeJSON(T)(auto ref JSONValue root)
     {
         ret = new T();
         if(ret is null)
-            throw new Exception("Could not create an instance of " ~ fullyQualifiedName!T);
+            throw new SerializationException("Could not create an instance of " ~ fullyQualifiedName!T);
     }
-    foreach(alias prop; serializablesWriteable!T)
+    foreach(alias prop; writeableSerializables!T)
     {
         enum name = getSerializableName!prop;
         static if(isJSONRequired!prop)
         {
             if((name in root) is null && isJSONRequired!prop)
-                throw new Exception("Missing required field \"" ~ name ~ "\" in JSON!");
+                throw new SerializationException("Missing required field \"" ~ name ~ "\" in JSON!");
         }
         if(name in root)
         {
@@ -145,7 +145,7 @@ T deserializeJSON(T)(auto ref JSONValue root)
 /**
  * Deserialize a JSON string into `T`
  */
-T deserializeJSONFromString(T)(string json)
+T deserializeJSONFromString(T)(string json) @safe
 {
     return deserializeJSON!T(parseJSON(json));
 }
@@ -175,92 +175,94 @@ T deserializeJSONFromString(T)(string json)
     assertNotThrown(deserializeJSON!B(res));
 }
 
-private JSONValue serializeAutoObj(T)(auto ref T obj)
+private @safe
 {
-    static if(isJSONNumber!T || isJSONString!T || is(T == bool))
-        return JSONValue(obj);
-    else static if(is(T == struct))
-        return serializeJSON(obj);
-    else static if(is(T == class))
-        return serializeJSON(obj);
-    else static if(isPointer!T && is(PointerTarget!T == struct))
-        return obj is null ? JSONValue(null) : serializeJSON(obj);
-    else static if(isArray!T)
-        return serializeJSONArray(obj);
-    else static assert(false, "Cannot serialize type " ~ T.stringof);
-
-}
-
-private JSONValue serializeJSONArray(T)(auto ref T obj)
-{
-    JSONValue v = JSONValue(new JSONValue[0]);
-    foreach(i; obj)
-        v.array ~= serializeAutoObj(i);
-    return v;
-}
-
-private T deserializeAutoObj(T)(auto ref JSONValue value)
-{
-    static if(is(T == struct))
-        return deserializeJSON!T(value);
-    else static if(isPointer!T && is(PointerTarget!T == struct))
+    JSONValue serializeAutoObj(T)(auto ref T obj) @trusted
     {
-        if(value.isNull)
-            return null;
-        alias underlying = PointerTarget!T;
-        underlying* ret = new underlying;
-        *ret = deserializeAutoObj!underlying(value);
+        static if(isJSONNumber!T || isJSONString!T || is(T == bool))
+            return JSONValue(obj);
+        else static if(is(T == struct))
+            return serializeJSON(obj);
+        else static if(is(T == class))
+            return serializeJSON(obj);
+        else static if(isPointer!T && is(PointerTarget!T == struct))
+            return obj is null ? JSONValue(null) : serializeJSON(obj);
+        else static if(isArray!T)
+            return serializeJSONArray(obj);
+        else static assert(false, "Cannot serialize type " ~ T.stringof);
+
+    }
+
+    JSONValue serializeJSONArray(T)(auto ref T obj) @trusted
+    {
+        JSONValue v = JSONValue(new JSONValue[0]);
+        foreach(i; obj)
+            v.array ~= serializeAutoObj(i);
+        return v;
+    }
+
+    T deserializeAutoObj(T)(auto ref JSONValue value) @trusted
+    {
+        static if(is(T == struct))
+            return deserializeJSON!T(value);
+        else static if(isPointer!T && is(PointerTarget!T == struct))
+        {
+            if(value.isNull)
+                return null;
+            alias underlying = PointerTarget!T;
+            underlying* ret = new underlying;
+            *ret = deserializeAutoObj!underlying(value);
+            return ret;
+        }
+        else static if(is(T == class))
+        {
+            return deserializeJSON!T(value);
+        }
+        else static if(isJSONString!T)
+            return value.get!T;
+        else static if(isArray!T)
+            return deserializeJSONArray!T(value);
+        else return value.get!T;
+    }
+
+    T deserializeJSONArray(T)(auto ref JSONValue value) @trusted
+    {
+        T ret;
+        static if(!__traits(isStaticArray, T))
+            ret = new T(value.arrayNoRef.length);
+        foreach(i, val; value.arrayNoRef)
+            ret[i] = deserializeAutoObj!(typeof(ret[0]))(val);
         return ret;
     }
-    else static if(is(T == class))
+
+    template isJSONRequired(alias T)
     {
-        return deserializeJSON!T(value);
+        enum bool isJSONRequired = getUDAs!(T, jsonRequired).length > 0;
     }
-    else static if(isJSONString!T)
-        return value.get!T;
-    else static if(isArray!T)
-        return deserializeJSONArray!T(value);
-    else return value.get!T;
-}
 
-private T deserializeJSONArray(T)(auto ref JSONValue value)
-{
-    T ret;
-    static if(!__traits(isStaticArray, T))
-        ret = new T(value.arrayNoRef.length);
-    foreach(i, val; value.arrayNoRef)
-        ret[i] = deserializeAutoObj!(typeof(ret[0]))(val);
-    return ret;
-}
+    template isJSONNumber(T)
+    {
+        enum bool isJSONNumber = __traits(isScalar, T) && !isPointer!T && !is(T == bool);
+    }
+    ///
+    unittest
+    {
+        assert(isJSONNumber!int);
+        assert(isJSONNumber!float);
+        assert(!isJSONNumber!bool);
+        assert(!isJSONNumber!string);
+    }
 
-private template isJSONRequired(alias T)
-{
-    enum bool isJSONRequired = getUDAs!(T, jsonRequired).length > 0;
+    template isJSONString(T)
+    {
+        enum bool isJSONString = is(T == string) || is(T == wstring) || is(T == dstring);
+    }
+    ///
+    @safe unittest
+    {
+        assert(isJSONString!string && isJSONString!wstring && isJSONString!dstring);
+    }
 }
-
-private template isJSONNumber(T)
-{
-    enum bool isJSONNumber = __traits(isScalar, T) && !isPointer!T && !is(T == bool);
-}
-///
-unittest
-{
-    assert(isJSONNumber!int);
-    assert(isJSONNumber!float);
-    assert(!isJSONNumber!bool);
-    assert(!isJSONNumber!string);
-}
-
-private template isJSONString(T)
-{
-    enum bool isJSONString = is(T == string) || is(T == wstring) || is(T == dstring);
-}
-///
-@safe unittest
-{
-    assert(isJSONString!string && isJSONString!wstring && isJSONString!dstring);
-}
-
 // For UT purposes. Declaring those in a unittest causes frame pointer errors
 version(unittest)
 {
