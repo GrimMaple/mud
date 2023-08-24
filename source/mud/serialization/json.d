@@ -371,3 +371,42 @@ unittest
 
     A a = deserializeJSON!A(parseJSON("{\"a\": 123}"));
 }
+
+// Test for const and immutable objects
+@safe unittest
+{
+    struct A
+    {
+        @serializable int a = 12;
+    }
+
+    static class B
+    {
+        @serializable int a = 12;
+    }
+
+    struct C
+    {
+        @serializable int a() const { return _a; }
+        private int _a = 12;
+    }
+
+    immutable aa = A();
+    const ab = A();
+
+    immutable ba = new B();
+    immutable bb = new B();
+
+    immutable ca = C();
+
+    immutable expected = `{"a":12}`;
+
+    assert(serializeToJSONString(aa) == expected);
+    assert(serializeToJSONString(ab) == expected);
+
+    assert(serializeToJSONString(ba) == expected);
+    assert(serializeToJSONString(bb) == expected);
+
+    assert(serializeToJSONString(C()) == expected);
+    assert(serializeToJSONString(ca) == expected);
+}
