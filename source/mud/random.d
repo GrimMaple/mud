@@ -10,6 +10,8 @@ interface IRandom
     bool nextBool() @safe;
 }
 
+alias DefaultRandom = RandomEngine!Random;
+
 /// Creates an instance of a common `IRandom` from a selected Random Engine `T`
 class RandomEngine(T) if(isUniformRNG!T) : IRandom
 {
