@@ -1,3 +1,94 @@
+/+
+    == serialization ==
+    Copyright Alexey Drozhzhin aka Grim Maple 2024
+    Distributed under the Boost Software License, Version 1.0.
++/
+/++
+    This is a serialization module for OpenD programming language!
+    It contains an API for making serializers and includes JSON serializator.
+
+    The JSON serializator is implemented via `std.json`.
+
+    ## Usage examples
+
+    ### Basic usage
+
+    By-design, only fields marked as [serializable] would be visible to serializator
+    ---
+    struct Foo
+    {
+        @serializable int bar;
+        float bar;
+    }
+    ---
+    Using the code above, only `bar` would be "visible" for serialization.
+    Please not that `@serializable` can be applied to field, or getter/setter functions.
+    A getter function is a function that returns non-void and has no parameters.
+    A setter function is a function that returns void and has exactly 1 parameter.
+    $(NOTE
+        Only a single [serializable] UDA is allowed per member. Having more will result in
+        a compile-time error.
+    )
+
+    Example usage with getter/setter functions:
+    ---
+    struct Foo
+    {
+        @serializable void foo(int bar) { }
+        @serialziable int foo() { }
+    }
+    ---
+
+    To control how serizliation is done, `@serializable` attribute has a constructor
+    that accepts a string, which is then used as a name for serializtion
+    ---
+    struct Foo
+    {
+        // This field will be serialized with the name "Bar"
+        @serializable("Bar") int baz;
+    }
+    ---
+
+    If serialization fails for any reason, [SerializationException] is used.
+
+    ### Advanced usage
+
+    A common desirable behavior is to serialize structs/classes that were not originally annotated
+    with [serializable]. For such use-case, it's advised to use getter/setter serialization to convert
+    such types to another type that is easily serializable:
+
+    ---
+    struct Foo
+    {
+        @serializable("entry") string serEntry() { return entry.path; }
+        @serializable("entry") void serEntry(string path) { entry = DirEntry(path); }
+        DirEntry entry;
+    }
+    ---
+
+    ### Writing serializers
+
+    To make a custom serializer, use any of those helper templates:
+    [serializableFields], [writeableSerializables], [readableSerializables].
+    Usage should be quite obvious from their names! Here's a silly sample code that
+    serializes a custom type `T`:
+    ---
+    string serialize(T)(auto ref T t)
+    {
+        streing return;
+        foreach(alias prop; readableSerializables!T)
+        {
+            auto name = getSerializableName!prop;
+            auto val = __traits(child, obj, prop).to!string;
+            return ~= name ~ ":" ~ val ~ "\n";
+        }
+        return return;
+    }
+    ---
+
+    Please refer to the provided JSON serialization module for a comprehensive example!
++/
+
 module mud.serialization;
 
 import std.meta : Filter, AliasSeq;

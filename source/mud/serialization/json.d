@@ -1,3 +1,58 @@
+/+
+    == serialization.json ==
+    Copyright Alexey Drozhzhin aka Grim Maple 2024
+    Distributed under the Boost Software License, Version 1.0.
++/
+/++
+    This is a JSON serializer for OpenD programming language.
+
+    $(PITFALL
+        JSON Serializer relies on `new` to create arrays and objects, so it's incompatible
+        with `@nogc` and `betterC` code. Limited compatibility might be provided if no
+        arrays / objects are used in serializable object
+    )
+
+    ## Usage examples
+    To use this serializer, annotate any field you want serialized with [serializable].
+    JSON serializator will attempt to automatically convert primitives to corresponding
+    JSON tupes, such as any of the number types to JSON Number, string to JSON String,
+    bool to JSON true/false.
+
+    ---
+    struct Foo
+    {
+        @serializable int bar;
+        @serializable string baz;
+    }
+
+    string test = serializeToJSONString(Foo());
+    ---
+
+    By default, serializer will skip serializing fields that are `null`.
+    If you want to ensure that a ceratin field exists in the JSON object, use [jsonRequired]
+    attribute:
+    ---
+    struct Foo
+    {
+        @serializable object bar;
+        @serializable @jsonRequired object baz;
+    }
+
+    assert(serializeToJSONString(Foo()) == "{\"baz\": null}")
+    ---
+
+    Marking a field with [jsonRequired] will also result in an error if a required field was
+    missing when deserializing:
+
+    ---
+    struct Foo
+    {
+        @serializeable @jsonRequired object bar;
+    }
+
+    deserializeJSONFromString!Foo("{}"); // Error
+    ---
++/
 module mud.serialization.json;
 
 import std.traits;
@@ -67,10 +122,10 @@ JSONValue serializeJSON(T)(auto ref T obj) @safe
 /**
  * Serialize `T` into a JSON string
  */
-string serializeToJSONString(T)(auto ref T obj) @safe
+string serializeToJSONString(T)(auto ref T obj, in bool pretty = false) @safe
 {
     auto val = serializeJSON(obj);
-    return toJSON(val);
+    return toJSON(val, pretty);
 }
 ///
 @safe unittest
@@ -409,4 +464,22 @@ unittest
 
     assert(serializeToJSONString(C()) == expected);
     assert(serializeToJSONString(ca) == expected);
+}
+
+// Unittest for virtual getters
+@safe unittest
+{
+    static class A
+    {
+        @serializable int b() @safe { return 0; }
+    }
+
+    static class B : A
+    {
+        override int b() @safe { return 1; }
+    }
+
+    B b = new B();
+
+    assert(serializeToJSONString(cast(A)b) == `{"b":1}`);
 }
