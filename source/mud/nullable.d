@@ -138,7 +138,7 @@ struct MaybeNull(T) if(is(T == class))
 private:
     T get() @safe
     {
-        if(t == null)
+        if(t is null)
             throw new ValueNullException();
         return t;
     }

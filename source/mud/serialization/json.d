@@ -383,8 +383,17 @@ unittest
         @serializable() Other object;
         @serializable Other[3] arrayOfObjects;
         @serializable Other* nullable = null;
-        @(imported!"core.attribute".mutableRefInit) @serializable Other* structField = new Other("t", 1);
-        @(imported!"core.attribute".mutableRefInit) @serializable Test classField = new Test();
+        
+        version(D_OpenD)
+        {
+            @(imported!"core.attribute".mutableRefInit) @serializable Other* structField = new Other("t", 1);
+            @(imported!"core.attribute".mutableRefInit) @serializable Test classField = new Test();
+        }
+        else
+        {
+            @serializable Other* structField = new Other("t", 1);
+            @serializable Test classField = new Test();
+        }
     }
 
     auto orig = Foo();
